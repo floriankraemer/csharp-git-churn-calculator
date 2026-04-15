@@ -1,0 +1,41 @@
+using GitChurnCalculator.Models;
+
+namespace GitChurnCalculator.Services;
+
+public interface IGitDataProvider
+{
+    /// <summary>
+    /// Returns all tracked file paths in the repository.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetTrackedFilesAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file commit count (all time).
+    /// </summary>
+    Task<Dictionary<string, int>> GetCommitCountsAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file commit count since the given date.
+    /// </summary>
+    Task<Dictionary<string, int>> GetCommitCountsSinceAsync(string repoPath, DateTime since, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the first (oldest) commit date per file.
+    /// </summary>
+    Task<Dictionary<string, DateTime>> GetFirstCommitDatesAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the last (newest) commit date per file.
+    /// </summary>
+    Task<Dictionary<string, DateTime>> GetLastCommitDatesAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file unique author count (all time).
+    /// </summary>
+    Task<Dictionary<string, int>> GetUniqueAuthorCountsAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file unique author count since the given date.
+    /// </summary>
+    Task<Dictionary<string, int>> GetUniqueAuthorCountsSinceAsync(string repoPath, DateTime since, CancellationToken ct = default);
+}
