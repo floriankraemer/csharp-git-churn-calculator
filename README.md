@@ -2,19 +2,59 @@
 
 A .NET 8 tool that calculates a **Churn Risk Score** for every file in a git repository by combining change frequency, author spread, and optional test coverage data.
 
-## Formula
+## How churn is calculated
 
+The CLI reports several git-derived metrics plus a **Churn Risk Score**. Only tracked files with at least one commit in history are included (`TotalCommits > 0`).
+
+### Inputs from git
+
+- **TotalCommits** — how many times the file appears across `git log` (each commit that lists the file counts once).
+- **FirstCommitDate** / **LastCommitDate** — timestamps from the log for that file’s first and latest appearance.
+- **TotalUniqueAuthors** — count of distinct author emails that touched the file over all time (other author columns use the same idea over rolling windows).
+
+### Change frequency (velocity)
+
+Let **now** be the analysis time (UTC), **first** the file’s first commit date, and:
+
+```math
+\text{AgeDays} = \max\bigl(1,\ \text{whole days from first to now}\bigr)
 ```
-ChurnRiskScore = ChangesPerWeek * TotalUniqueAuthors * (1 - CoveragePercent / 100)
+
+Average commit rates use fixed day-length denominators (same as the implementation):
+
+```math
+\text{ChangesPerWeek} = \frac{\text{TotalCommits}}{\text{AgeDays} / 7}
+\qquad
+\text{ChangesPerMonth} = \frac{\text{TotalCommits}}{\text{AgeDays} / 30.44}
+\qquad
+\text{ChangesPerYear} = \frac{\text{TotalCommits}}{\text{AgeDays} / 365.25}
 ```
 
-| Factor | What it measures |
-|--------|-----------------|
-| **ChangesPerWeek** | How often the file changes (churn velocity) |
-| **TotalUniqueAuthors** | How many different people have touched the file (knowledge fragmentation) |
-| **(1 - Coverage/100)** | Risk multiplier from missing tests (1.0 = no tests, 0.0 = fully covered) |
+These values are rounded for display (two decimal places in output). The risk score uses the unrounded `ChangesPerWeek` internally, then the final score is rounded to four decimals.
 
-Without a coverage file the risk multiplier defaults to 1.0, so the score becomes `ChangesPerWeek * TotalUniqueAuthors`.
+### Churn Risk Score
+
+Let $c = \text{ChangesPerWeek}$, $A = \text{TotalUniqueAuthors}$, and $p$ be line coverage in percent ($0 \le p \le 100$) when Cobertura data exists for that file.
+
+**Without coverage** (no `--coverage` file): coverage is not applied and the risk multiplier is always $1$:
+
+```math
+\text{ChurnRiskScore} = c \times A
+```
+
+**With coverage** (`--coverage` and a mapped Cobertura class for that path):
+
+```math
+\text{ChurnRiskScore} = c \times A \times \left(1 - \frac{p}{100}\right)
+```
+
+The factor $\left(1 - \frac{p}{100}\right)$ is **higher when coverage is lower** (no coverage → multiplier $1$; full coverage → multiplier $0$, so the score is $0$ aside from rounding). If a Cobertura file is supplied but a git file is **not** matched to any class, it is treated as **$p = 0$** (same multiplier as “no tests” in the formula above).
+
+| Symbol / field | Meaning |
+|----------------|---------|
+| $c$ (**ChangesPerWeek**) | Commit velocity over the file’s lifetime |
+| $A$ (**TotalUniqueAuthors**) | How many different people have touched the file |
+| $1 - p/100$ | Test-gap multiplier from line coverage (only when `--coverage` is used and the file maps into the report) |
 
 ## Solution Structure
 
@@ -74,7 +114,7 @@ dotnet run --project GitChurnCalculator.Console -- <repo-path> [options]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `<repo-path>` | *(required)* | Path to the git repository to analyze |
-| `--format <csv\|json>` | `csv` | Output format |
+| `--format <csv\|json\|html>` | `csv` | Output format (`html` = Bootstrap-styled table page) |
 | `--coverage <path>` | *(none)* | Path to a Cobertura XML coverage file |
 | `--output <path>` | stdout | Write output to a file instead of stdout |
 
@@ -96,6 +136,12 @@ Include Cobertura coverage data:
 
 ```bash
 dotnet run --project GitChurnCalculator.Console -- /path/to/repo --coverage coverage.cobertura.xml
+```
+
+HTML table report (Bootstrap via CDN; open the file in a browser):
+
+```bash
+dotnet run --project GitChurnCalculator.Console -- /path/to/repo --format html --output churn.html
 ```
 
 ## Output Fields

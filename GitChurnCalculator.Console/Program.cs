@@ -1,8 +1,5 @@
 using System.CommandLine;
-using System.Globalization;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using GitChurnCalculator.Console.Reporting;
 using GitChurnCalculator.Models;
 using GitChurnCalculator.Services;
 
@@ -13,7 +10,7 @@ var repoArgument = new Argument<DirectoryInfo>(
 var formatOption = new Option<string>(
     "--format",
     getDefaultValue: () => "csv",
-    description: "Output format: csv or json");
+    description: $"Output format: {ChurnReportGeneratorFactory.SupportedFormatsList}");
 
 var coverageOption = new Option<FileInfo?>(
     "--coverage",
@@ -47,10 +44,9 @@ rootCommand.SetHandler(async (DirectoryInfo repo, string format, FileInfo? cover
         return;
     }
 
-    if (!string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase) &&
-        !string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
+    if (!ChurnReportGeneratorFactory.TryGet(format, out var generator) || generator is null)
     {
-        Console.Error.WriteLine($"Error: Unsupported format '{format}'. Use 'csv' or 'json'.");
+        Console.Error.WriteLine($"Error: Unsupported format '{format}'. Use {ChurnReportGeneratorFactory.SupportedFormatsList}.");
         Environment.ExitCode = 1;
         return;
     }
@@ -73,9 +69,7 @@ rootCommand.SetHandler(async (DirectoryInfo repo, string format, FileInfo? cover
 
     Console.Error.WriteLine($"Found {results.Count} files with commit history.");
 
-    var outputText = string.Equals(format, "json", StringComparison.OrdinalIgnoreCase)
-        ? FormatJson(results)
-        : FormatCsv(results);
+    var outputText = generator.Generate(results, repo.FullName);
 
     if (output is not null)
     {
@@ -90,44 +84,3 @@ rootCommand.SetHandler(async (DirectoryInfo repo, string format, FileInfo? cover
 }, repoArgument, formatOption, coverageOption, outputOption);
 
 return await rootCommand.InvokeAsync(args);
-
-static string FormatCsv(IReadOnlyList<FileChurnResult> results)
-{
-    var sb = new StringBuilder();
-    sb.AppendLine("File,TotalCommits,FirstCommitDate,LastCommitDate,AgeDays,ChangesPerWeek,ChangesPerMonth,ChangesPerYear,CommitsLast7Days,CommitsLast30Days,CommitsLast365Days,TotalUniqueAuthors,UniqueAuthorsLast7Days,UniqueAuthorsLast30Days,UniqueAuthorsLast365Days,CoveragePercent,ChurnRiskScore");
-
-    foreach (var r in results)
-    {
-        sb.Append('"').Append(r.FilePath.Replace("\"", "\"\"")).Append('"');
-        sb.Append(',').Append(r.TotalCommits);
-        sb.Append(',').Append(r.FirstCommitDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "");
-        sb.Append(',').Append(r.LastCommitDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "");
-        sb.Append(',').Append(r.AgeDays);
-        sb.Append(',').Append(r.ChangesPerWeek.ToString("F2", CultureInfo.InvariantCulture));
-        sb.Append(',').Append(r.ChangesPerMonth.ToString("F2", CultureInfo.InvariantCulture));
-        sb.Append(',').Append(r.ChangesPerYear.ToString("F2", CultureInfo.InvariantCulture));
-        sb.Append(',').Append(r.CommitsLast7Days);
-        sb.Append(',').Append(r.CommitsLast30Days);
-        sb.Append(',').Append(r.CommitsLast365Days);
-        sb.Append(',').Append(r.TotalUniqueAuthors);
-        sb.Append(',').Append(r.UniqueAuthorsLast7Days);
-        sb.Append(',').Append(r.UniqueAuthorsLast30Days);
-        sb.Append(',').Append(r.UniqueAuthorsLast365Days);
-        sb.Append(',').Append(r.CoveragePercent?.ToString("F2", CultureInfo.InvariantCulture) ?? "");
-        sb.Append(',').Append(r.ChurnRiskScore.ToString("F4", CultureInfo.InvariantCulture));
-        sb.AppendLine();
-    }
-
-    return sb.ToString();
-}
-
-static string FormatJson(IReadOnlyList<FileChurnResult> results)
-{
-    var jsonOptions = new JsonSerializerOptions
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-    };
-    return JsonSerializer.Serialize(results, jsonOptions);
-}

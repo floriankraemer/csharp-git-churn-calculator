@@ -1,0 +1,17 @@
+namespace GitChurnCalculator.Console.Reporting;
+
+public static class ChurnReportGeneratorFactory
+{
+    private static readonly IReadOnlyDictionary<string, IChurnReportGenerator> Generators =
+        new Dictionary<string, IChurnReportGenerator>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["csv"] = new CsvChurnReportGenerator(),
+            ["json"] = new JsonChurnReportGenerator(),
+            ["html"] = new HtmlTableChurnReportGenerator(),
+        };
+
+    public static bool TryGet(string format, out IChurnReportGenerator? generator)
+        => Generators.TryGetValue(format.Trim(), out generator);
+
+    public static string SupportedFormatsList => "csv, html, json";
+}
