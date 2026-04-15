@@ -54,6 +54,30 @@ The factor $\left(1 - \frac{p}{100}\right)$ is **higher when coverage is lower**
 | $A$ (**TotalUniqueAuthors**) | How many different people have touched the file |
 | $1 - p/100$ | Test-gap multiplier from line coverage (only when `--coverage` is used and the file maps into the report) |
 
+## Time series mode
+
+When `--series week` or `--series month` is used together with `--from` (and optionally `--to`), the tool runs the full analysis repeatedly — once per bucket end date — over the specified date range.
+
+### How "as of" anchoring works
+
+Each analysis point receives an **`AsOf`** date (the bucket end). The tool passes this date as `--until` to every `git log` query, so history is bounded: commits after `AsOf` are invisible to that point's analysis. This means:
+
+- **`TotalCommits`**, **`FirstCommitDate`**, **`LastCommitDate`**, and **`TotalUniqueAuthors`** only count commits on or before `AsOf`.
+- Rolling windows (`CommitsLast7Days`, `UniqueAuthorsLast30Days`, etc.) are calculated relative to `AsOf`, not the wall-clock time the tool is run.
+- **`AgeDays`** is the span from a file's first commit (as of that date) to `AsOf`.
+
+### Output shape
+
+| Format | Shape |
+|--------|-------|
+| JSON | Array of `{ "asOf": "yyyy-MM-dd", "files": [...] }` objects, one per time point |
+| CSV | Flat rows with a leading `AsOf` column; one row per `(asOf, file)` pair |
+| HTML | Bootstrap page with one collapsible `<details>` section per time point |
+
+### Performance
+
+The tool executes **one full set of git queries per time point**. For a weekly series covering one year that is approximately 52 × 10 = 520 `git log` invocations. On large repositories or long date ranges this can take several minutes.
+
 ## Cobertura coverage mapping
 
 The tool maps Cobertura XML `<class filename="...">` entries to git-tracked files using:

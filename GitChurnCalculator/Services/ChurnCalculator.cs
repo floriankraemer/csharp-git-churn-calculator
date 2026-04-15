@@ -18,24 +18,52 @@ public sealed class ChurnCalculator
         CancellationToken ct = default)
     {
         var repoPath = options.RepositoryPath;
-        var now = DateTime.UtcNow;
+        var now = options.AsOf ?? DateTime.UtcNow;
         var sevenDaysAgo = now.AddDays(-7);
         var thirtyDaysAgo = now.AddDays(-30);
         var yearAgo = now.AddDays(-365);
 
         var trackedFiles = await _gitDataProvider.GetTrackedFilesAsync(repoPath, ct);
 
-        // Run independent git queries in parallel
-        var commitCountsTask = _gitDataProvider.GetCommitCountsAsync(repoPath, ct);
-        var firstDatesTask = _gitDataProvider.GetFirstCommitDatesAsync(repoPath, ct);
-        var lastDatesTask = _gitDataProvider.GetLastCommitDatesAsync(repoPath, ct);
-        var commits7Task = _gitDataProvider.GetCommitCountsSinceAsync(repoPath, sevenDaysAgo, ct);
-        var commits30Task = _gitDataProvider.GetCommitCountsSinceAsync(repoPath, thirtyDaysAgo, ct);
-        var commits365Task = _gitDataProvider.GetCommitCountsSinceAsync(repoPath, yearAgo, ct);
-        var authorsAllTask = _gitDataProvider.GetUniqueAuthorCountsAsync(repoPath, ct);
-        var authors7Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, sevenDaysAgo, ct);
-        var authors30Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, thirtyDaysAgo, ct);
-        var authors365Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, yearAgo, ct);
+        // Run independent git queries in parallel.
+        // When AsOf is set, use date-bounded variants so history is anchored to that point in time.
+        Task<Dictionary<string, int>> commitCountsTask;
+        Task<Dictionary<string, DateTime>> firstDatesTask;
+        Task<Dictionary<string, DateTime>> lastDatesTask;
+        Task<Dictionary<string, int>> commits7Task;
+        Task<Dictionary<string, int>> commits30Task;
+        Task<Dictionary<string, int>> commits365Task;
+        Task<Dictionary<string, int>> authorsAllTask;
+        Task<Dictionary<string, int>> authors7Task;
+        Task<Dictionary<string, int>> authors30Task;
+        Task<Dictionary<string, int>> authors365Task;
+
+        if (options.AsOf.HasValue)
+        {
+            commitCountsTask = _gitDataProvider.GetCommitCountsUntilAsync(repoPath, now, ct);
+            firstDatesTask = _gitDataProvider.GetFirstCommitDatesUntilAsync(repoPath, now, ct);
+            lastDatesTask = _gitDataProvider.GetLastCommitDatesUntilAsync(repoPath, now, ct);
+            commits7Task = _gitDataProvider.GetCommitCountsSinceUntilAsync(repoPath, sevenDaysAgo, now, ct);
+            commits30Task = _gitDataProvider.GetCommitCountsSinceUntilAsync(repoPath, thirtyDaysAgo, now, ct);
+            commits365Task = _gitDataProvider.GetCommitCountsSinceUntilAsync(repoPath, yearAgo, now, ct);
+            authorsAllTask = _gitDataProvider.GetUniqueAuthorCountsUntilAsync(repoPath, now, ct);
+            authors7Task = _gitDataProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, sevenDaysAgo, now, ct);
+            authors30Task = _gitDataProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, thirtyDaysAgo, now, ct);
+            authors365Task = _gitDataProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, yearAgo, now, ct);
+        }
+        else
+        {
+            commitCountsTask = _gitDataProvider.GetCommitCountsAsync(repoPath, ct);
+            firstDatesTask = _gitDataProvider.GetFirstCommitDatesAsync(repoPath, ct);
+            lastDatesTask = _gitDataProvider.GetLastCommitDatesAsync(repoPath, ct);
+            commits7Task = _gitDataProvider.GetCommitCountsSinceAsync(repoPath, sevenDaysAgo, ct);
+            commits30Task = _gitDataProvider.GetCommitCountsSinceAsync(repoPath, thirtyDaysAgo, ct);
+            commits365Task = _gitDataProvider.GetCommitCountsSinceAsync(repoPath, yearAgo, ct);
+            authorsAllTask = _gitDataProvider.GetUniqueAuthorCountsAsync(repoPath, ct);
+            authors7Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, sevenDaysAgo, ct);
+            authors30Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, thirtyDaysAgo, ct);
+            authors365Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, yearAgo, ct);
+        }
 
         await Task.WhenAll(
             commitCountsTask, firstDatesTask, lastDatesTask,

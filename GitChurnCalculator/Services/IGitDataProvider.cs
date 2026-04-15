@@ -15,9 +15,19 @@ public interface IGitDataProvider
     Task<Dictionary<string, int>> GetCommitCountsAsync(string repoPath, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns per-file commit count for all commits up to and including the given date.
+    /// </summary>
+    Task<Dictionary<string, int>> GetCommitCountsUntilAsync(string repoPath, DateTime until, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns per-file commit count since the given date.
     /// </summary>
     Task<Dictionary<string, int>> GetCommitCountsSinceAsync(string repoPath, DateTime since, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file commit count for commits in the half-open interval (since, until].
+    /// </summary>
+    Task<Dictionary<string, int>> GetCommitCountsSinceUntilAsync(string repoPath, DateTime since, DateTime until, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the first (oldest) commit date per file.
@@ -25,9 +35,19 @@ public interface IGitDataProvider
     Task<Dictionary<string, DateTime>> GetFirstCommitDatesAsync(string repoPath, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the first (oldest) commit date per file for commits up to and including the given date.
+    /// </summary>
+    Task<Dictionary<string, DateTime>> GetFirstCommitDatesUntilAsync(string repoPath, DateTime until, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the last (newest) commit date per file.
     /// </summary>
     Task<Dictionary<string, DateTime>> GetLastCommitDatesAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the last (newest) commit date per file for commits up to and including the given date.
+    /// </summary>
+    Task<Dictionary<string, DateTime>> GetLastCommitDatesUntilAsync(string repoPath, DateTime until, CancellationToken ct = default);
 
     /// <summary>
     /// Returns per-file unique author count (all time).
@@ -35,7 +55,17 @@ public interface IGitDataProvider
     Task<Dictionary<string, int>> GetUniqueAuthorCountsAsync(string repoPath, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns per-file unique author count for commits up to and including the given date.
+    /// </summary>
+    Task<Dictionary<string, int>> GetUniqueAuthorCountsUntilAsync(string repoPath, DateTime until, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns per-file unique author count since the given date.
     /// </summary>
     Task<Dictionary<string, int>> GetUniqueAuthorCountsSinceAsync(string repoPath, DateTime since, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file unique author count for commits in the half-open interval (since, until].
+    /// </summary>
+    Task<Dictionary<string, int>> GetUniqueAuthorCountsSinceUntilAsync(string repoPath, DateTime since, DateTime until, CancellationToken ct = default);
 }

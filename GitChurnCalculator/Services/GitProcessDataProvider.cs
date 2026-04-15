@@ -22,10 +22,24 @@ public sealed class GitProcessDataProvider : IGitDataProvider
         return ParseFileCountsFromNameOnlyLog(output);
     }
 
+    public async Task<Dictionary<string, int>> GetCommitCountsUntilAsync(string repoPath, DateTime until, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(repoPath, $"log{UntilClause(until)} --pretty=format: --name-only", ct);
+        return ParseFileCountsFromNameOnlyLog(output);
+    }
+
     public async Task<Dictionary<string, int>> GetCommitCountsSinceAsync(string repoPath, DateTime since, CancellationToken ct = default)
     {
-        var sinceStr = since.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var output = await RunGitAsync(repoPath, $"log --since=\"{sinceStr}\" --pretty=format: --name-only", ct);
+        var output = await RunGitAsync(repoPath, $"log{SinceClause(since)} --pretty=format: --name-only", ct);
+        return ParseFileCountsFromNameOnlyLog(output);
+    }
+
+    public async Task<Dictionary<string, int>> GetCommitCountsSinceUntilAsync(string repoPath, DateTime since, DateTime until, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(
+            repoPath,
+            $"log{SinceClause(since)}{UntilClause(until)} --pretty=format: --name-only",
+            ct);
         return ParseFileCountsFromNameOnlyLog(output);
     }
 
@@ -35,9 +49,21 @@ public sealed class GitProcessDataProvider : IGitDataProvider
         return ParseFirstDatePerFile(output);
     }
 
+    public async Task<Dictionary<string, DateTime>> GetFirstCommitDatesUntilAsync(string repoPath, DateTime until, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(repoPath, $"log{UntilClause(until)} --reverse --format=%ai --name-only", ct);
+        return ParseFirstDatePerFile(output);
+    }
+
     public async Task<Dictionary<string, DateTime>> GetLastCommitDatesAsync(string repoPath, CancellationToken ct = default)
     {
         var output = await RunGitAsync(repoPath, "log --format=%ai --name-only", ct);
+        return ParseFirstDatePerFile(output);
+    }
+
+    public async Task<Dictionary<string, DateTime>> GetLastCommitDatesUntilAsync(string repoPath, DateTime until, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(repoPath, $"log{UntilClause(until)} --format=%ai --name-only", ct);
         return ParseFirstDatePerFile(output);
     }
 
@@ -47,10 +73,30 @@ public sealed class GitProcessDataProvider : IGitDataProvider
         return ParseUniqueAuthorCounts(output);
     }
 
+    public async Task<Dictionary<string, int>> GetUniqueAuthorCountsUntilAsync(string repoPath, DateTime until, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(
+            repoPath,
+            $"log{UntilClause(until)} --pretty=format:\"COMMIT %ae\" --name-only",
+            ct);
+        return ParseUniqueAuthorCounts(output);
+    }
+
     public async Task<Dictionary<string, int>> GetUniqueAuthorCountsSinceAsync(string repoPath, DateTime since, CancellationToken ct = default)
     {
-        var sinceStr = since.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var output = await RunGitAsync(repoPath, $"log --since=\"{sinceStr}\" --pretty=format:\"COMMIT %ae\" --name-only", ct);
+        var output = await RunGitAsync(
+            repoPath,
+            $"log{SinceClause(since)} --pretty=format:\"COMMIT %ae\" --name-only",
+            ct);
+        return ParseUniqueAuthorCounts(output);
+    }
+
+    public async Task<Dictionary<string, int>> GetUniqueAuthorCountsSinceUntilAsync(string repoPath, DateTime since, DateTime until, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(
+            repoPath,
+            $"log{SinceClause(since)}{UntilClause(until)} --pretty=format:\"COMMIT %ae\" --name-only",
+            ct);
         return ParseUniqueAuthorCounts(output);
     }
 
@@ -71,7 +117,9 @@ public sealed class GitProcessDataProvider : IGitDataProvider
 
     /// <summary>
     /// Parses git log output with date lines followed by file name lines.
-    /// Returns the first encountered date for each file (works for both --reverse and non-reverse logs).
+    /// Returns the first date encountered for each path in traversal order:
+    /// with <c>--reverse</c> that is the oldest commit touching the file; without <c>--reverse</c>
+    /// (newest-first log) it is the most recent commit touching the file.
     /// </summary>
     public static Dictionary<string, DateTime> ParseFirstDatePerFile(string output)
     {
@@ -128,6 +176,13 @@ public sealed class GitProcessDataProvider : IGitDataProvider
 
         return fileAuthors.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal);
     }
+
+    private static string FormatLogDate(DateTime value) =>
+        value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static string UntilClause(DateTime until) => $" --until=\"{FormatLogDate(until)}\"";
+
+    private static string SinceClause(DateTime since) => $" --since=\"{FormatLogDate(since)}\"";
 
     private static bool TryParseGitDate(string value, out DateTime result)
     {

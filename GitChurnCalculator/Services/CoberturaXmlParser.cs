@@ -5,6 +5,11 @@ namespace GitChurnCalculator.Services;
 
 public sealed class CoberturaXmlParser : ICoberturaParser
 {
+    public Dictionary<string, double> MapToTrackedFiles(
+        Dictionary<string, double> coverageByPath,
+        IReadOnlyList<string> trackedGitRelativePaths) =>
+        MapToGitFiles(coverageByPath, trackedGitRelativePaths);
+
     public Dictionary<string, double> Parse(string coberturaFilePath)
     {
         var doc = XDocument.Load(coberturaFilePath);

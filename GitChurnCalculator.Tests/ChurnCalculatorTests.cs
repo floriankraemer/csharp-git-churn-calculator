@@ -176,11 +176,14 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
 
-        coberturaParser.Parse("/fake/coverage.xml").Returns(new Dictionary<string, double>
+        var coverageDict = new Dictionary<string, double>
         {
             ["covered.cs"] = 90.0,
             ["uncovered.cs"] = 10.0,
-        });
+        };
+        coberturaParser.Parse("/fake/coverage.xml").Returns(coverageDict);
+        coberturaParser.MapToTrackedFiles(Arg.Any<Dictionary<string, double>>(), Arg.Any<IReadOnlyList<string>>())
+            .Returns(ci => ci.ArgAt<Dictionary<string, double>>(0));
 
         var calculator = new ChurnCalculator(gitProvider, coberturaParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions
@@ -225,5 +228,131 @@ public class ChurnCalculatorTests
 
         Assert.Single(results);
         Assert.Null(results[0].CoveragePercent);
+    }
+
+    // ── AsOf / time series tests ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task AnalyzeAsync_WithAsOf_UsesUntilBoundedMethods()
+    {
+        var gitProvider = Substitute.For<IGitDataProvider>();
+        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var repoPath = "/fake/repo";
+        var asOf = new DateTime(2024, 6, 30, 0, 0, 0, DateTimeKind.Utc);
+
+        gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new List<string> { "file.cs" });
+
+        var commitCounts = new Dictionary<string, int> { ["file.cs"] = 10 };
+        gitProvider.GetCommitCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>())
+            .Returns(commitCounts);
+
+        var dates = new Dictionary<string, DateTime> { ["file.cs"] = asOf.AddDays(-30) };
+        gitProvider.GetFirstCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>()).Returns(dates);
+        gitProvider.GetLastCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>()).Returns(dates);
+
+        gitProvider.GetUniqueAuthorCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, int> { ["file.cs"] = 2 });
+
+        var empty = new Dictionary<string, int>();
+        gitProvider.GetCommitCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
+        gitProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
+
+        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions
+        {
+            RepositoryPath = repoPath,
+            AsOf = asOf,
+        });
+
+        Assert.Single(results);
+
+        // Verify unbounded methods were NOT called
+        await gitProvider.DidNotReceive().GetCommitCountsAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetFirstCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetLastCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>());
+
+        // Verify bounded methods WERE called
+        await gitProvider.Received(1).GetCommitCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetFirstCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetLastCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetUniqueAuthorCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WithAsOf_RollingWindowsRelativeToAsOf()
+    {
+        var gitProvider = Substitute.For<IGitDataProvider>();
+        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var repoPath = "/fake/repo";
+        var asOf = new DateTime(2024, 3, 31, 0, 0, 0, DateTimeKind.Utc);
+        var expectedSevenDaysAgo = asOf.AddDays(-7);
+
+        gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new List<string> { "file.cs" });
+
+        gitProvider.GetCommitCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, int> { ["file.cs"] = 5 });
+
+        var dates = new Dictionary<string, DateTime> { ["file.cs"] = asOf.AddDays(-60) };
+        gitProvider.GetFirstCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>()).Returns(dates);
+        gitProvider.GetLastCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>()).Returns(dates);
+        gitProvider.GetUniqueAuthorCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, int> { ["file.cs"] = 1 });
+
+        var empty = new Dictionary<string, int>();
+        gitProvider.GetCommitCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
+        gitProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
+
+        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath, AsOf = asOf });
+
+        // Rolling window calls should use asOf-relative since dates (not UtcNow-relative)
+        await gitProvider.Received().GetCommitCountsSinceUntilAsync(
+            repoPath,
+            Arg.Is<DateTime>(d => Math.Abs((d - expectedSevenDaysAgo).TotalSeconds) < 1),
+            asOf,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WithoutAsOf_UsesUnboundedMethods()
+    {
+        var gitProvider = Substitute.For<IGitDataProvider>();
+        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var repoPath = "/fake/repo";
+
+        gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new List<string> { "file.cs" });
+
+        gitProvider.GetCommitCountsAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, int> { ["file.cs"] = 10 });
+
+        var now = DateTime.UtcNow;
+        var dates = new Dictionary<string, DateTime> { ["file.cs"] = now.AddDays(-14) };
+        gitProvider.GetFirstCommitDatesAsync(repoPath, Arg.Any<CancellationToken>()).Returns(dates);
+        gitProvider.GetLastCommitDatesAsync(repoPath, Arg.Any<CancellationToken>()).Returns(dates);
+        gitProvider.GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, int> { ["file.cs"] = 2 });
+
+        var empty = new Dictionary<string, int>();
+        gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
+        gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
+
+        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
+
+        // Unbounded methods WERE called
+        await gitProvider.Received(1).GetCommitCountsAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetFirstCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetLastCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>());
+
+        // Bounded Until methods were NOT called
+        await gitProvider.DidNotReceive().GetCommitCountsUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetFirstCommitDatesUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetLastCommitDatesUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetUniqueAuthorCountsUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 }

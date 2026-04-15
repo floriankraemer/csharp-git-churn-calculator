@@ -1,0 +1,130 @@
+using System.Globalization;
+using System.Net;
+using System.Text;
+using GitChurnCalculator.Models;
+
+namespace GitChurnCalculator.Console.Reporting;
+
+/// <summary>
+/// Full HTML document with one collapsible section per time point, styled with Bootstrap from a CDN.
+/// </summary>
+public sealed class HtmlTimeSeriesReportGenerator : ITimeSeriesReportGenerator
+{
+    private const string BootstrapCssCdn =
+        "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
+
+    public string Generate(IReadOnlyList<TimeSeriesPoint> points, string subtitle)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var sb = new StringBuilder(128_000);
+
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html lang=\"en\">");
+        sb.AppendLine("<head>");
+        sb.AppendLine("  <meta charset=\"utf-8\" />");
+        sb.AppendLine("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />");
+        sb.AppendLine("  <title>Git churn risk — time series</title>");
+        sb.Append("  <link href=\"").Append(BootstrapCssCdn).Append("\" rel=\"stylesheet\"");
+        sb.AppendLine(" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer-when-downgrade\" />");
+        sb.AppendLine("</head>");
+        sb.AppendLine("<body class=\"bg-light\">");
+        sb.AppendLine("  <div class=\"container-fluid py-4\">");
+        sb.AppendLine("    <header class=\"mb-4\">");
+        sb.AppendLine("      <h1 class=\"h2\">Git churn risk — time series</h1>");
+        sb.Append("      <p class=\"text-muted mb-0\"><code>").Append(WebUtility.HtmlEncode(subtitle)).AppendLine("</code></p>");
+        sb.Append("      <p class=\"small text-secondary\">")
+            .Append(WebUtility.HtmlEncode(points.Count.ToString(inv)))
+            .AppendLine(" time points</p>");
+        sb.AppendLine("    </header>");
+
+        foreach (var point in points)
+        {
+            var label = point.AsOf.ToString("yyyy-MM-dd", inv);
+            sb.AppendLine("    <details class=\"mb-3\" open>");
+            sb.Append("      <summary class=\"fw-semibold fs-5 mb-2\">")
+                .Append(WebUtility.HtmlEncode(label))
+                .Append(" <span class=\"badge bg-secondary fw-normal\">")
+                .Append(WebUtility.HtmlEncode(point.Files.Count.ToString(inv)))
+                .AppendLine(" files</span></summary>");
+            sb.AppendLine("      <div class=\"table-responsive shadow-sm bg-white rounded\">");
+            sb.AppendLine("        <table class=\"table table-striped table-hover table-sm table-bordered align-middle mb-0\">");
+            sb.AppendLine("          <thead class=\"table-dark\">");
+            sb.AppendLine("            <tr>");
+            AppendTh(sb, "File");
+            AppendTh(sb, "Churn risk");
+            AppendTh(sb, "Changes / wk");
+            AppendTh(sb, "Authors");
+            AppendTh(sb, "Coverage %");
+            AppendTh(sb, "Total commits");
+            AppendTh(sb, "First commit");
+            AppendTh(sb, "Last commit");
+            AppendTh(sb, "Age (days)");
+            AppendTh(sb, "Commits 7d");
+            AppendTh(sb, "Commits 30d");
+            AppendTh(sb, "Commits 365d");
+            AppendTh(sb, "Authors 7d");
+            AppendTh(sb, "Authors 30d");
+            AppendTh(sb, "Authors 365d");
+            AppendTh(sb, "Changes / mo");
+            AppendTh(sb, "Changes / yr");
+            sb.AppendLine("            </tr>");
+            sb.AppendLine("          </thead>");
+            sb.AppendLine("          <tbody>");
+
+            foreach (var r in point.Files)
+            {
+                sb.AppendLine("            <tr>");
+                AppendTdCode(sb, r.FilePath);
+                AppendTd(sb, r.ChurnRiskScore.ToString("F4", inv));
+                AppendTd(sb, r.ChangesPerWeek.ToString("F2", inv));
+                AppendTd(sb, r.TotalUniqueAuthors.ToString(inv));
+                AppendTd(sb, r.CoveragePercent?.ToString("F2", inv) ?? "—");
+                AppendTd(sb, r.TotalCommits.ToString(inv));
+                AppendTd(sb, r.FirstCommitDate?.ToString("yyyy-MM-dd", inv) ?? "");
+                AppendTd(sb, r.LastCommitDate?.ToString("yyyy-MM-dd", inv) ?? "");
+                AppendTd(sb, r.AgeDays.ToString(inv));
+                AppendTd(sb, r.CommitsLast7Days.ToString(inv));
+                AppendTd(sb, r.CommitsLast30Days.ToString(inv));
+                AppendTd(sb, r.CommitsLast365Days.ToString(inv));
+                AppendTd(sb, r.UniqueAuthorsLast7Days.ToString(inv));
+                AppendTd(sb, r.UniqueAuthorsLast30Days.ToString(inv));
+                AppendTd(sb, r.UniqueAuthorsLast365Days.ToString(inv));
+                AppendTd(sb, r.ChangesPerMonth.ToString("F2", inv));
+                AppendTd(sb, r.ChangesPerYear.ToString("F2", inv));
+                sb.AppendLine("            </tr>");
+            }
+
+            sb.AppendLine("          </tbody>");
+            sb.AppendLine("        </table>");
+            sb.AppendLine("      </div>");
+            sb.AppendLine("    </details>");
+        }
+
+        sb.AppendLine("    <footer class=\"mt-3 small text-secondary\">Generated by GitChurnCalculator</footer>");
+        sb.AppendLine("  </div>");
+        sb.AppendLine("</body>");
+        sb.AppendLine("</html>");
+        return sb.ToString();
+    }
+
+    private static void AppendTh(StringBuilder sb, string text)
+    {
+        sb.Append("              <th scope=\"col\" class=\"text-nowrap\">")
+            .Append(WebUtility.HtmlEncode(text))
+            .AppendLine("</th>");
+    }
+
+    private static void AppendTd(StringBuilder sb, string text)
+    {
+        sb.Append("              <td class=\"text-nowrap\">")
+            .Append(WebUtility.HtmlEncode(text))
+            .AppendLine("</td>");
+    }
+
+    private static void AppendTdCode(StringBuilder sb, string path)
+    {
+        sb.Append("              <td><code class=\"small\">")
+            .Append(WebUtility.HtmlEncode(path))
+            .AppendLine("</code></td>");
+    }
+}

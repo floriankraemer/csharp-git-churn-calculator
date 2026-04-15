@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GitChurnCalculator\GitChurnCalculator.csproj" />
+    <ProjectReference Include="..\GitChurnCalculator.Console\GitChurnCalculator.Console.csproj" />
   </ItemGroup>
 
 </Project>

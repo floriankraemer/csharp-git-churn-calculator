@@ -21,6 +21,9 @@ dotnet run --project GitChurnCalculator.Console -- <repo-path> [options]
 | `--format <csv\|json\|html>` | `csv` | Output format (`html` = Bootstrap-styled table page) |
 | `--coverage <path>` | *(none)* | Path to a Cobertura XML coverage file |
 | `--output <path>` | stdout | Write output to a file instead of stdout |
+| `--series <week\|month>` | *(none)* | Produce a time series by stepping in week or month chunks. Requires `--from`. |
+| `--from <yyyy-MM-dd>` | *(none)* | Start date for time series (inclusive). Required when `--series` is used. |
+| `--to <yyyy-MM-dd>` | today | End date for time series (inclusive). Defaults to today when `--series` is used. |
 
 ### Examples
 
@@ -47,6 +50,26 @@ HTML table report (Bootstrap via CDN; open the file in a browser):
 ```bash
 dotnet run --project GitChurnCalculator.Console -- /path/to/repo --format html --output churn.html
 ```
+
+### Time series
+
+Produce a weekly time series for a date range and save as JSON:
+
+```bash
+dotnet run --project GitChurnCalculator.Console -- /path/to/repo \
+  --series week --from 2024-01-01 --to 2024-03-01 \
+  --format json --output series.json
+```
+
+Monthly time series as HTML (one collapsible section per month):
+
+```bash
+dotnet run --project GitChurnCalculator.Console -- /path/to/repo \
+  --series month --from 2024-01-01 \
+  --format html --output series.html
+```
+
+Time series output includes all the same per-file columns as the single-snapshot report, with an additional `AsOf` column (CSV) or `asOf` field (JSON) identifying the bucket end date. Each time point's metrics — including rolling windows like `CommitsLast7Days` — are calculated relative to that point's date, not the current date. The `--format` flag selects the format for both single-snapshot and time series modes.
 
 ## Output Fields
 
