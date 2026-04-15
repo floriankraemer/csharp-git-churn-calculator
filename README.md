@@ -137,6 +137,37 @@ The tool maps Cobertura XML `<class filename="...">` entries to git-tracked file
 dotnet test
 ```
 
+## Code coverage (this repository)
+
+The test project uses [Coverlet](https://github.com/coverlet-coverage/coverlet) (MSBuild integration). HTML reports are produced with [ReportGenerator](https://github.com/danielpalme/ReportGenerator) via a [local dotnet tool](.config/dotnet-tools.json).
+
+**PowerShell** (from the repo root):
+
+```powershell
+.\make.ps1 coverage
+```
+
+This runs `dotnet tool restore`, tests in **Release** with coverage, writes **Cobertura** XML and an **HTML** site under `artifacts/coverage/`:
+
+| Output | Path |
+|--------|------|
+| Cobertura | `artifacts/coverage/coverage.cobertura.xml` |
+| HTML report | `artifacts/coverage/html/index.html` |
+
+**Manual equivalent** (from the repository root; use an **absolute** `CoverletOutput` prefix so the file lands under `artifacts/coverage/`):
+
+```bash
+dotnet tool restore
+dotnet test GitChurnCalculator.slnx -c Release \
+  /p:CollectCoverage=true \
+  /p:CoverletOutput="$PWD/artifacts/coverage/coverage" \
+  /p:CoverletOutputFormat=cobertura
+dotnet tool run reportgenerator -- \
+  -reports:artifacts/coverage/coverage.cobertura.xml \
+  -targetdir:artifacts/coverage/html \
+  -reporttypes:Html
+```
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

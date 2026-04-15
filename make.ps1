@@ -11,6 +11,7 @@
     .\make.ps1 clean
     .\make.ps1 publish-single
     .\make.ps1 publish-single linux-x64
+    .\make.ps1 coverage
 
 .PARAMETER Target
   The target to run. Use 'help' or omit to list targets.
@@ -58,6 +59,7 @@ Targets:
   clean            remove bin/obj folders under the solution
   ci               restore, build-release, test-release
   publish-single   self-contained single-file publish -> artifacts\publish-<RID>
+  coverage         run tests with Coverlet + HTML report -> artifacts/coverage
   help             show this message
 "@
 }
@@ -112,6 +114,60 @@ switch ($Target.ToLowerInvariant()) {
             "-o", $outDir
         )
         Write-Host "Done. Output folder: $outDir"
+    }
+    "coverage" {
+        $coverageDir = Join-Path $PSScriptRoot (Join-Path "artifacts" "coverage")
+        New-Item -ItemType Directory -Force -Path $coverageDir | Out-Null
+        $coverageBase = Join-Path $coverageDir "coverage"
+        $coberturaPath = "$coverageBase.cobertura.xml"
+        $htmlDir = Join-Path $coverageDir "html"
+
+        Write-Host "Restoring dotnet tools (ReportGenerator)..."
+        Push-Location $PSScriptRoot
+        try {
+            Invoke-DotNet @("tool", "restore")
+
+            Write-Host "Running tests with code coverage (Coverlet)..."
+            Invoke-DotNet @(
+                "test", $Sln,
+                "-c", "Release",
+                "--verbosity", "minimal",
+                "/p:CollectCoverage=true",
+                "/p:CoverletOutput=$coverageBase",
+                "/p:CoverletOutputFormat=cobertura"
+            )
+
+            if (-not (Test-Path $coberturaPath)) {
+                Write-Host "Expected Cobertura file not found: $coberturaPath" -ForegroundColor Red
+                exit 1
+            }
+
+            if (Test-Path $htmlDir) {
+                Remove-Item -Recurse -Force $htmlDir
+            }
+
+            # Use repo-relative paths for ReportGenerator so Windows drive letters are not parsed as -reports flags.
+            $coberturaRel = "artifacts/coverage/coverage.cobertura.xml"
+            $htmlRel = "artifacts/coverage/html"
+
+            Write-Host "Generating HTML report (ReportGenerator)..."
+            Invoke-DotNet @(
+                "tool", "run", "reportgenerator",
+                "--",
+                "-reports:$coberturaRel",
+                "-targetdir:$htmlRel",
+                "-reporttypes:Html"
+            )
+        }
+        finally {
+            Pop-Location
+        }
+
+        $indexHtml = Join-Path $htmlDir "index.html"
+        Write-Host ""
+        Write-Host "Coverage complete." -ForegroundColor Green
+        Write-Host "  Cobertura: $coberturaPath"
+        Write-Host "  HTML:      $indexHtml"
     }
     default {
         Write-Host "Unknown target: $Target" -ForegroundColor Red
