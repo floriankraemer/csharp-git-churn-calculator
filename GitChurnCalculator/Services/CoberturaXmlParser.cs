@@ -39,15 +39,8 @@ public sealed class CoberturaXmlParser : ICoberturaParser
             var relativePath = MakeRelative(normalized, sourcePrefixes);
 
             // Multiple <class> elements can map to the same file; keep the max coverage.
-            if (coverage.TryGetValue(relativePath, out var existing))
-            {
-                if (coveragePercent > existing)
-                    coverage[relativePath] = coveragePercent;
-            }
-            else
-            {
+            if (!coverage.TryGetValue(relativePath, out var existing) || coveragePercent > existing)
                 coverage[relativePath] = coveragePercent;
-            }
         }
 
         return coverage;
@@ -80,31 +73,16 @@ public sealed class CoberturaXmlParser : ICoberturaParser
             }
 
             // 2. Suffix match: find a git file that ends with the coverage path
-            var matched = false;
-            foreach (var (normalizedGit, originalGit) in gitFileLookup)
+            if (TryGetSuffixGitMatch(gitFileLookup, covPath, out var suffixOriginal))
             {
-                if (normalizedGit.EndsWith("/" + covPath, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedGit.Equals(covPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    result[originalGit] = percent;
-                    matched = true;
-                    break;
-                }
+                result[suffixOriginal] = percent;
+                continue;
             }
 
-            if (!matched)
-            {
-                // 3. Try matching just the filename portion
-                var fileName = covPath.Split('/').Last();
-                foreach (var (normalizedGit, originalGit) in gitFileLookup)
-                {
-                    if (normalizedGit.Split('/').Last().Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        result[originalGit] = percent;
-                        break;
-                    }
-                }
-            }
+            // 3. Try matching just the filename portion
+            var fileName = covPath.Split('/').Last();
+            if (TryGetGitMatchByFileName(gitFileLookup, fileName, out var nameOriginal))
+                result[nameOriginal] = percent;
         }
 
         return result;
@@ -120,11 +98,47 @@ public sealed class CoberturaXmlParser : ICoberturaParser
         foreach (var prefix in sourcePrefixes)
         {
             var prefixWithSlash = prefix.EndsWith('/') ? prefix : prefix + "/";
-            if (normalizedPath.StartsWith(prefixWithSlash, StringComparison.OrdinalIgnoreCase))
-            {
-                return normalizedPath[prefixWithSlash.Length..];
-            }
+            if (!normalizedPath.StartsWith(prefixWithSlash, StringComparison.OrdinalIgnoreCase))
+                continue;
+            return normalizedPath[prefixWithSlash.Length..];
         }
         return normalizedPath;
+    }
+
+    private static bool TryGetSuffixGitMatch(
+        Dictionary<string, string> gitFileLookup,
+        string covPath,
+        out string originalGit)
+    {
+        foreach (var (normalizedGit, orig) in gitFileLookup)
+        {
+            if (normalizedGit.EndsWith("/" + covPath, StringComparison.OrdinalIgnoreCase) ||
+                normalizedGit.Equals(covPath, StringComparison.OrdinalIgnoreCase))
+            {
+                originalGit = orig;
+                return true;
+            }
+        }
+
+        originalGit = null!;
+        return false;
+    }
+
+    private static bool TryGetGitMatchByFileName(
+        Dictionary<string, string> gitFileLookup,
+        string fileName,
+        out string originalGit)
+    {
+        foreach (var (normalizedGit, orig) in gitFileLookup)
+        {
+            if (normalizedGit.Split('/').Last().Equals(fileName, StringComparison.OrdinalIgnoreCase))
+            {
+                originalGit = orig;
+                return true;
+            }
+        }
+
+        originalGit = null!;
+        return false;
     }
 }
