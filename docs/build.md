@@ -6,9 +6,10 @@ Commands below assume the **repository root** as the current directory. For what
 
 ```
 GitChurnCalculator.slnx
-├── GitChurnCalculator/           Class library with all business logic
-├── GitChurnCalculator.Console/   CLI application (CSV / JSON output)
-└── GitChurnCalculator.Tests/     xUnit tests
+├── GitChurnCalculator/                 Class library with all business logic
+├── GitChurnCalculator.Console/       CLI application (CSV / JSON output)
+├── GitChurnCalculator.Tests/           xUnit tests for the class library
+└── GitChurnCalculator.Console.Tests/   xUnit tests for the console app (reporting, etc.)
 ```
 
 ## Prerequisites
@@ -48,6 +49,8 @@ Replace `win-x64` with the [runtime identifier](https://learn.microsoft.com/en-u
 Output is written under `artifacts/publish-<RID>/` (ignored by git).
 
 For a smaller publish that still needs the .NET 8 runtime installed on the target, use `--self-contained false` instead.
+
+Pushing a git tag that matches SemVer **without** a `v` prefix runs the [release workflow](../.github/workflows/release.yml): stable tags like `1.2.3`, or prerelease tags with a hyphen after the patch number such as `1.0.0-rc` or `1.0.0-rc.1`. The workflow publishes self-contained single-file builds for `win-x64`, `linux-x64`, `osx-x64`, and `osx-arm64` and uploads them to a GitHub Release.
 
 ## Running tests
 

@@ -2,4 +2,5 @@
   <Project Path="GitChurnCalculator/GitChurnCalculator.csproj" />
   <Project Path="GitChurnCalculator.Console/GitChurnCalculator.Console.csproj" />
   <Project Path="GitChurnCalculator.Tests/GitChurnCalculator.Tests.csproj" />
+  <Project Path="GitChurnCalculator.Console.Tests/GitChurnCalculator.Console.Tests.csproj" />
 </Solution>

@@ -3,7 +3,7 @@ using GitChurnCalculator.Console.Reporting;
 using GitChurnCalculator.Models;
 using Xunit;
 
-namespace GitChurnCalculator.Tests;
+namespace GitChurnCalculator.Console.Tests;
 
 public class TimeSeriesReportGeneratorTests
 {

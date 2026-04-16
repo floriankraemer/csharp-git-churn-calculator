@@ -24,4 +24,18 @@
     <ProjectReference Include="..\GitChurnCalculator\GitChurnCalculator.csproj" />
   </ItemGroup>
 
+  <!-- Keep AssemblyName = project file name so the class library and console app do not both emit GitChurnCalculator.dll; rename only the published apphost. -->
+  <Target Name="RenamePublishedExecutable" AfterTargets="Publish">
+    <PropertyGroup>
+      <!-- AppHost uses .exe on Windows RIDs; Unix apphost has no extension (TargetExt is .dll during Publish). -->
+      <_AppHostExt Condition="'$(RuntimeIdentifier)' != '' and $(RuntimeIdentifier.StartsWith('win'))">.exe</_AppHostExt>
+      <_AppHostExt Condition="'$(_AppHostExt)' == '' and '$(RuntimeIdentifier)' == '' and '$(OS)' == 'Windows_NT'">.exe</_AppHostExt>
+      <_AppHostExt Condition="'$(_AppHostExt)' == ''"></_AppHostExt>
+      <_PublishedAppHost>$(PublishDir)$(AssemblyName)$(_AppHostExt)</_PublishedAppHost>
+      <_PublishedAppHostFinal>$(PublishDir)GitChurnCalculator$(_AppHostExt)</_PublishedAppHostFinal>
+    </PropertyGroup>
+    <Delete Files="$(_PublishedAppHostFinal)" Condition="Exists('$(_PublishedAppHostFinal)')" />
+    <Move SourceFiles="$(_PublishedAppHost)" DestinationFiles="$(_PublishedAppHostFinal)" Condition="Exists('$(_PublishedAppHost)')" />
+  </Target>
+
 </Project>
