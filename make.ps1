@@ -41,6 +41,33 @@ function Invoke-DotNet {
     }
 }
 
+function Get-DefaultRuntimeIdentifier {
+    # RuntimeIdentifier is not available in Windows PowerShell 5.1/.NET Framework.
+    # Try reflection first, then dotnet --info, then a safe Windows fallback.
+    $runtimeInfoType = [System.Runtime.InteropServices.RuntimeInformation]
+    $runtimeIdProp = $runtimeInfoType.GetProperty("RuntimeIdentifier", [System.Reflection.BindingFlags]::Public -bor [System.Reflection.BindingFlags]::Static)
+    if ($null -ne $runtimeIdProp) {
+        $runtimeId = [string] $runtimeIdProp.GetValue($null, $null)
+        if (-not [string]::IsNullOrWhiteSpace($runtimeId)) {
+            return $runtimeId
+        }
+    }
+
+    $ridLine = (& dotnet --info 2>$null) | Select-String -Pattern "^\s*RID:\s*(.+)$" | Select-Object -First 1
+    if ($null -ne $ridLine) {
+        $runtimeId = $ridLine.Matches[0].Groups[1].Value.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($runtimeId)) {
+            return $runtimeId
+        }
+    }
+
+    if ([Environment]::Is64BitOperatingSystem) {
+        return "win-x64"
+    }
+
+    return "win-x86"
+}
+
 function Show-Help {
     @"
 Git Churn Calculator — make.ps1
@@ -102,7 +129,7 @@ switch ($Target.ToLowerInvariant()) {
     "publish-single" {
         $rid = $RuntimeIdentifier
         if ([string]::IsNullOrWhiteSpace($rid)) {
-            $rid = [System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
+            $rid = Get-DefaultRuntimeIdentifier
         }
         $outDir = Join-Path $PSScriptRoot (Join-Path "artifacts" "publish-$rid")
         Write-Host "Publishing self-contained single-file for RID: $rid -> $outDir"
