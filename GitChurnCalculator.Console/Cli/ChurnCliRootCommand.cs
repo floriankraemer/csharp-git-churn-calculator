@@ -18,7 +18,7 @@ public static class ChurnCliRootCommand
 
         var coverageOption = new Option<FileInfo?>(
             "--coverage",
-            description: "Path to a Cobertura XML coverage file (optional)");
+            description: "Path to a coverage XML file (Cobertura or VS coverage format, auto-detected)");
 
         var outputOption = new Option<FileInfo?>(
             "--output",

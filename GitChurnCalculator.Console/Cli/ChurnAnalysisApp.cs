@@ -9,7 +9,7 @@ public sealed class ChurnAnalysisApp
     private readonly ChurnCalculator _calculator;
 
     public ChurnAnalysisApp()
-        : this(new ChurnCalculator(new GitProcessDataProvider(), new CoberturaXmlParser()))
+        : this(new ChurnCalculator(new GitProcessDataProvider(), new AutoDetectCoverageParser()))
     {
     }
 
@@ -62,7 +62,7 @@ public sealed class ChurnAnalysisApp
         var options = new ChurnAnalysisOptions
         {
             RepositoryPath = repo.FullName,
-            CoberturaFilePath = coverage?.FullName,
+            CoverageFilePath = coverage?.FullName,
         };
 
         var results = await _calculator.AnalyzeAsync(options);
@@ -116,7 +116,7 @@ public sealed class ChurnAnalysisApp
             var options = new ChurnAnalysisOptions
             {
                 RepositoryPath = repo.FullName,
-                CoberturaFilePath = coverage?.FullName,
+                CoverageFilePath = coverage?.FullName,
                 AsOf = asOf,
             };
             var results = await _calculator.AnalyzeAsync(options);
