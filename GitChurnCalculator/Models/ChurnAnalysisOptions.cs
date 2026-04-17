@@ -3,7 +3,7 @@ namespace GitChurnCalculator.Models;
 public sealed class ChurnAnalysisOptions
 {
     public required string RepositoryPath { get; init; }
-    public string? CoberturaFilePath { get; init; }
+    public string? CoverageFilePath { get; init; }
 
     /// <summary>
     /// When set, the analysis treats this date as "now": all git queries are bounded

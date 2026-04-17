@@ -90,7 +90,7 @@ public class ChurnCalculatorTests
     public async Task AnalyzeAsync_SortsResultsByChurnRiskScoreDescending()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();
-        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var coverageParser = Substitute.For<ICoverageParser>();
         var repoPath = "/fake/repo";
 
         gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
@@ -127,7 +127,7 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
 
-        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
 
         Assert.Equal(3, results.Count);
@@ -143,7 +143,7 @@ public class ChurnCalculatorTests
     public async Task AnalyzeAsync_WithCoverage_AppliesRiskMultiplier()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();
-        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var coverageParser = Substitute.For<ICoverageParser>();
         var repoPath = "/fake/repo";
 
         gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
@@ -181,15 +181,15 @@ public class ChurnCalculatorTests
             ["covered.cs"] = 90.0,
             ["uncovered.cs"] = 10.0,
         };
-        coberturaParser.Parse("/fake/coverage.xml").Returns(coverageDict);
-        coberturaParser.MapToTrackedFiles(Arg.Any<Dictionary<string, double>>(), Arg.Any<IReadOnlyList<string>>())
+        coverageParser.Parse("/fake/coverage.xml").Returns(coverageDict);
+        coverageParser.MapToTrackedFiles(Arg.Any<Dictionary<string, double>>(), Arg.Any<IReadOnlyList<string>>())
             .Returns(ci => ci.ArgAt<Dictionary<string, double>>(0));
 
-        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions
         {
             RepositoryPath = repoPath,
-            CoberturaFilePath = "/fake/coverage.xml",
+            CoverageFilePath = "/fake/coverage.xml",
         });
 
         Assert.Equal(2, results.Count);
@@ -203,7 +203,7 @@ public class ChurnCalculatorTests
     public async Task AnalyzeAsync_WithoutCoverage_CoveragePercentIsNull()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();
-        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var coverageParser = Substitute.For<ICoverageParser>();
         var repoPath = "/fake/repo";
 
         gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
@@ -223,7 +223,7 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
 
-        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
 
         Assert.Single(results);
@@ -236,7 +236,7 @@ public class ChurnCalculatorTests
     public async Task AnalyzeAsync_WithAsOf_UsesUntilBoundedMethods()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();
-        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var coverageParser = Substitute.For<ICoverageParser>();
         var repoPath = "/fake/repo";
         var asOf = new DateTime(2024, 6, 30, 0, 0, 0, DateTimeKind.Utc);
 
@@ -258,7 +258,7 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
 
-        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions
         {
             RepositoryPath = repoPath,
@@ -284,7 +284,7 @@ public class ChurnCalculatorTests
     public async Task AnalyzeAsync_WithAsOf_RollingWindowsRelativeToAsOf()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();
-        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var coverageParser = Substitute.For<ICoverageParser>();
         var repoPath = "/fake/repo";
         var asOf = new DateTime(2024, 3, 31, 0, 0, 0, DateTimeKind.Utc);
         var expectedSevenDaysAgo = asOf.AddDays(-7);
@@ -305,7 +305,7 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
 
-        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
         await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath, AsOf = asOf });
 
         // Rolling window calls should use asOf-relative since dates (not UtcNow-relative)
@@ -320,7 +320,7 @@ public class ChurnCalculatorTests
     public async Task AnalyzeAsync_WithoutAsOf_UsesUnboundedMethods()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();
-        var coberturaParser = Substitute.For<ICoberturaParser>();
+        var coverageParser = Substitute.For<ICoverageParser>();
         var repoPath = "/fake/repo";
 
         gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
@@ -340,7 +340,7 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
 
-        var calculator = new ChurnCalculator(gitProvider, coberturaParser);
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
         await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
 
         // Unbounded methods WERE called

@@ -129,7 +129,7 @@ public class CoberturaParserTests
         var coverage = new Dictionary<string, double> { ["src/Foo.cs"] = 80.0 };
         var gitFiles = new List<string> { "src/Foo.cs", "src/Bar.cs" };
 
-        var mapped = CoberturaXmlParser.MapToGitFiles(coverage, gitFiles);
+        var mapped = CoveragePathMatcher.MapToGitFiles(coverage, gitFiles);
 
         Assert.Single(mapped);
         Assert.Equal(80.0, mapped["src/Foo.cs"]);
@@ -141,7 +141,7 @@ public class CoberturaParserTests
         var coverage = new Dictionary<string, double> { ["Foo.cs"] = 70.0 };
         var gitFiles = new List<string> { "src/services/Foo.cs", "src/Bar.cs" };
 
-        var mapped = CoberturaXmlParser.MapToGitFiles(coverage, gitFiles);
+        var mapped = CoveragePathMatcher.MapToGitFiles(coverage, gitFiles);
 
         Assert.Single(mapped);
         Assert.Equal(70.0, mapped["src/services/Foo.cs"]);
@@ -153,7 +153,7 @@ public class CoberturaParserTests
         var coverage = new Dictionary<string, double> { ["src\\Foo.cs"] = 60.0 };
         var gitFiles = new List<string> { "src/Foo.cs" };
 
-        var mapped = CoberturaXmlParser.MapToGitFiles(coverage, gitFiles);
+        var mapped = CoveragePathMatcher.MapToGitFiles(coverage, gitFiles);
 
         Assert.Single(mapped);
         Assert.Equal(60.0, mapped["src/Foo.cs"]);
@@ -162,12 +162,12 @@ public class CoberturaParserTests
     [Fact]
     public void NormalizePath_ConvertsBackslashes()
     {
-        Assert.Equal("src/foo/bar.cs", CoberturaXmlParser.NormalizePath("src\\foo\\bar.cs"));
+        Assert.Equal("src/foo/bar.cs", CoveragePathMatcher.NormalizePath("src\\foo\\bar.cs"));
     }
 
     [Fact]
     public void NormalizePath_TrimsTrailingSlash()
     {
-        Assert.Equal("src/foo", CoberturaXmlParser.NormalizePath("src/foo/"));
+        Assert.Equal("src/foo", CoveragePathMatcher.NormalizePath("src/foo/"));
     }
 }

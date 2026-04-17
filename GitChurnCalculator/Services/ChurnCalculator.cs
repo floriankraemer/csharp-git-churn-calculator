@@ -5,12 +5,12 @@ namespace GitChurnCalculator.Services;
 public sealed class ChurnCalculator
 {
     private readonly IGitDataProvider _gitDataProvider;
-    private readonly ICoberturaParser _coberturaParser;
+    private readonly ICoverageParser _coverageParser;
 
-    public ChurnCalculator(IGitDataProvider gitDataProvider, ICoberturaParser coberturaParser)
+    public ChurnCalculator(IGitDataProvider gitDataProvider, ICoverageParser coverageParser)
     {
         _gitDataProvider = gitDataProvider;
-        _coberturaParser = coberturaParser;
+        _coverageParser = coverageParser;
     }
 
     public async Task<IReadOnlyList<FileChurnResult>> AnalyzeAsync(
@@ -83,10 +83,10 @@ public sealed class ChurnCalculator
 
         // Parse coverage if provided
         Dictionary<string, double>? coverageMap = null;
-        if (!string.IsNullOrEmpty(options.CoberturaFilePath))
+        if (!string.IsNullOrEmpty(options.CoverageFilePath))
         {
-            var rawCoverage = _coberturaParser.Parse(options.CoberturaFilePath);
-            coverageMap = CoberturaXmlParser.MapToGitFiles(rawCoverage, trackedFiles);
+            var rawCoverage = _coverageParser.Parse(options.CoverageFilePath);
+            coverageMap = _coverageParser.MapToTrackedFiles(rawCoverage, trackedFiles);
         }
 
         var results = new List<FileChurnResult>(trackedFiles.Count);
