@@ -160,6 +160,21 @@ public class CoberturaParserTests
     }
 
     [Fact]
+    public void MapToGitFiles_AbsoluteCoveragePathMatchesRelativeGitPath()
+    {
+        var coverage = new Dictionary<string, double>
+        {
+            [@"C:\dev\project\Services\Domain\Foo.cs"] = 82.0,
+        };
+        var gitFiles = new List<string> { "Services/Domain/Foo.cs", "README.md" };
+
+        var mapped = CoveragePathMatcher.MapToGitFiles(coverage, gitFiles);
+
+        Assert.Single(mapped);
+        Assert.Equal(82.0, mapped["Services/Domain/Foo.cs"]);
+    }
+
+    [Fact]
     public void NormalizePath_ConvertsBackslashes()
     {
         Assert.Equal("src/foo/bar.cs", CoveragePathMatcher.NormalizePath("src\\foo\\bar.cs"));

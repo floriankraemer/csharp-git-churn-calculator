@@ -59,6 +59,7 @@ public static class CoveragePathMatcher
         foreach (var (normalizedGit, orig) in gitFileLookup)
         {
             if (normalizedGit.EndsWith("/" + covPath, StringComparison.OrdinalIgnoreCase) ||
+                covPath.EndsWith("/" + normalizedGit, StringComparison.OrdinalIgnoreCase) ||
                 normalizedGit.Equals(covPath, StringComparison.OrdinalIgnoreCase))
             {
                 originalGit = orig;
