@@ -2,7 +2,7 @@ using GitChurnCalculator.Models;
 
 namespace GitChurnCalculator.Services;
 
-public sealed class ChurnCalculator
+public sealed class ChurnCalculator : IChurnCalculator
 {
     private readonly IGitDataProvider _gitDataProvider;
     private readonly ICoverageParser _coverageParser;

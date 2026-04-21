@@ -6,14 +6,14 @@ namespace GitChurnCalculator.Console.Cli;
 
 public sealed class ChurnAnalysisApp
 {
-    private readonly ChurnCalculator _calculator;
+    private readonly IChurnCalculator _calculator;
 
     public ChurnAnalysisApp()
         : this(new ChurnCalculator(new GitProcessDataProvider(), new AutoDetectCoverageParser()))
     {
     }
 
-    public ChurnAnalysisApp(ChurnCalculator calculator) => _calculator = calculator;
+    public ChurnAnalysisApp(IChurnCalculator calculator) => _calculator = calculator;
 
     public async Task HandleAsync(
         DirectoryInfo repo,

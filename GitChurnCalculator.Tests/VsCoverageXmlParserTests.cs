@@ -300,4 +300,45 @@ public class AutoDetectCoverageParserTests
             File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public void AutoDetect_Parse_CoberturaFile_ReturnsCoverage()
+    {
+        var xml = """
+            <?xml version="1.0"?>
+            <coverage line-rate="1">
+              <packages>
+                <package name="p" line-rate="1" branch-rate="0" complexity="0">
+                  <classes>
+                    <class name="C" filename="src/Z.cs" line-rate="0.5" branch-rate="0" complexity="0"><lines/></class>
+                  </classes>
+                </package>
+              </packages>
+            </coverage>
+            """;
+        var path = Path.Combine(Path.GetTempPath(), "autodet-" + Guid.NewGuid() + ".xml");
+        try
+        {
+            File.WriteAllText(path, xml);
+            var sut = new AutoDetectCoverageParser();
+            var dict = sut.Parse(path);
+            Assert.Single(dict);
+            Assert.Equal(50.0, dict["src/Z.cs"]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void AutoDetect_MapToTrackedFiles_UsesMatcher()
+    {
+        var sut = new AutoDetectCoverageParser();
+        var cov = new Dictionary<string, double> { ["OnlyName.cs"] = 77.0 };
+        var tracked = new List<string> { "src/OnlyName.cs" };
+        var mapped = sut.MapToTrackedFiles(cov, tracked);
+        Assert.Single(mapped);
+        Assert.Equal(77.0, mapped["src/OnlyName.cs"]);
+    }
 }

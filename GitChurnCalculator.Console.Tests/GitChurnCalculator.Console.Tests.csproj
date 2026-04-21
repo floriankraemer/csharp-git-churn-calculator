@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Line coverage target applies to the console assembly; library is measured by GitChurnCalculator.Tests. -->
+    <Exclude>[GitChurnCalculator]*</Exclude>
+    <Threshold>85</Threshold>
+    <ThresholdType>line</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
   </PropertyGroup>
 
   <ItemGroup>

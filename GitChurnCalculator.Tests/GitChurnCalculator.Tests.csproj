@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- GitProcessDataProvider is subprocess/git integration; unit tests use IGitDataProvider substitutes. -->
+    <ExcludeByFile>**/GitProcessDataProvider.cs</ExcludeByFile>
+    <Threshold>85</Threshold>
+    <ThresholdType>line</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
   </PropertyGroup>
 
   <ItemGroup>
