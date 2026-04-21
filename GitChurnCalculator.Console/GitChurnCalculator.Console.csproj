@@ -5,15 +5,27 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Single-file when publishing: dotnet publish -r RID -p:SelfContained=true -->
-    <PublishSingleFile>true</PublishSingleFile>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <!-- Smaller self-contained publish: trim unused framework and app code, omit ICU data (app uses invariant culture for output). -->
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>partial</TrimMode>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <DebuggerSupport>false</DebuggerSupport>
+    <!-- Single-file only when a RID is set (e.g. make publish-single). pack-as-tool has no RID and must not use PublishSingleFile. -->
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
+    <EnableCompressionInSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' != ''">true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Smaller self-contained publish: trim only with RID; tool pack is not trimmed publish. -->
+    <PublishTrimmed Condition="'$(RuntimeIdentifier)' != ''">true</PublishTrimmed>
+    <TrimMode Condition="'$(RuntimeIdentifier)' != ''">partial</TrimMode>
+    <InvariantGlobalization Condition="'$(RuntimeIdentifier)' != ''">true</InvariantGlobalization>
+    <DebuggerSupport Condition="'$(RuntimeIdentifier)' != ''">false</DebuggerSupport>
+  </PropertyGroup>
+
+  <!-- dotnet pack -> global/local tool: dotnet tool install -g <PackageId> (framework-dependent) -->
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>GitChurnCalculator</ToolCommandName>
+    <!-- PackageId must differ from the class library project name in the same slnx. -->
+    <PackageId>GitChurnCalculator.Tool</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Florian Krämer</Authors>
+    <Description>Git churn statistics for C# and other text files — lines added/removed per file over a commit range.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>

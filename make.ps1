@@ -84,8 +84,9 @@ Targets:
   test-debug       dotnet test (Debug)
   test-release     dotnet test (Release)
   clean            remove bin/obj folders under the solution
-  ci               restore, build-release, test-release
+  ci               restore, build-release, test-release, pack (dotnet tool nupkg)
   publish-single   self-contained single-file publish -> artifacts\publish-<RID>
+  pack-tool        dotnet tool package -> artifacts\nupkg
   coverage         run tests with Coverlet + HTML report -> artifacts/coverage
   help             show this message
 "@
@@ -125,6 +126,14 @@ switch ($Target.ToLowerInvariant()) {
         Invoke-DotNet @("restore", $Sln)
         Invoke-DotNet @("build", $Sln, "-c", "Release", "--no-restore")
         Invoke-DotNet @("test", $Sln, "-c", "Release", "--verbosity", "normal", "--no-build")
+        Invoke-DotNet @("pack", $ConsoleProj, "-c", "Release", "--no-restore")
+    }
+    "pack-tool" {
+        $outDir = Join-Path $PSScriptRoot (Join-Path "artifacts" "nupkg")
+        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+        Write-Host "Packing .NET tool -> $outDir"
+        Invoke-DotNet @("pack", $ConsoleProj, "-c", "Release", "-o", $outDir)
+        Write-Host "Done."
     }
     "publish-single" {
         $rid = $RuntimeIdentifier
