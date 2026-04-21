@@ -8,10 +8,13 @@ public static class ChurnReportGeneratorFactory
             ["csv"] = new CsvChurnReportGenerator(),
             ["json"] = new JsonChurnReportGenerator(),
             ["html"] = new HtmlTableChurnReportGenerator(),
+            ["sarif"] = new SarifChurnReportGenerator(),
+            ["github"] = new GithubActionsChurnReportGenerator(),
+            ["gitlab"] = new GitlabCodeQualityChurnReportGenerator(),
         };
 
     public static bool TryGet(string format, out IChurnReportGenerator? generator)
         => Generators.TryGetValue(format.Trim(), out generator);
 
-    public static string SupportedFormatsList => "csv, html, json";
+    public static string SupportedFormatsList => "csv, html, json, sarif, github, gitlab";
 }
