@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using GitChurnCalculator.Models;
 
@@ -8,12 +7,6 @@ namespace GitChurnCalculator.Console.Reporting;
 public sealed class SarifChurnReportGenerator : IChurnReportGenerator
 {
     private const string RuleId = "churn/file-risk";
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
 
     public string Generate(IReadOnlyList<FileChurnResult> results, string subtitle)
     {
@@ -77,7 +70,9 @@ public sealed class SarifChurnReportGenerator : IChurnReportGenerator
             Runs = [run],
         };
 
-        return JsonSerializer.Serialize(log, JsonOptions);
+        return System.Text.Json.JsonSerializer.Serialize(
+            log,
+            ChurnReportsJsonContext.Default.SarifLog);
     }
 }
 

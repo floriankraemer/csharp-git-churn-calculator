@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using GitChurnCalculator.Models;
 
 namespace GitChurnCalculator.Console.Reporting;
@@ -9,12 +7,6 @@ namespace GitChurnCalculator.Console.Reporting;
 public sealed class GitlabCodeQualityChurnReportGenerator : IChurnReportGenerator
 {
     private const string CheckName = "churn/file-risk";
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
 
     public string Generate(IReadOnlyList<FileChurnResult> results, string subtitle)
     {
@@ -34,7 +26,9 @@ public sealed class GitlabCodeQualityChurnReportGenerator : IChurnReportGenerato
             },
         }).ToList();
 
-        return JsonSerializer.Serialize(issues, JsonOptions);
+        return System.Text.Json.JsonSerializer.Serialize(
+            issues,
+            ChurnReportsJsonContext.Default.IReadOnlyListGitlabCodeQualityIssue);
     }
 
     private static string ComputeFingerprint(string filePath)

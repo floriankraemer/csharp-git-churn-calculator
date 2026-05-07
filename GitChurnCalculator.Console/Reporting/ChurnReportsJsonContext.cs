@@ -14,4 +14,7 @@ namespace GitChurnCalculator.Console.Reporting;
 [JsonSerializable(typeof(TimeSeriesGraphPoint))]
 [JsonSerializable(typeof(TimeSeriesGraphSeries))]
 [JsonSerializable(typeof(IReadOnlyList<TimeSeriesGraphSeries>))]
+[JsonSerializable(typeof(GitlabCodeQualityIssue))]
+[JsonSerializable(typeof(IReadOnlyList<GitlabCodeQualityIssue>))]
+[JsonSerializable(typeof(SarifLog))]
 internal partial class ChurnReportsJsonContext : JsonSerializerContext;
