@@ -8,6 +8,7 @@ public static class TimeSeriesReportGeneratorFactory
             ["csv"] = new CsvTimeSeriesReportGenerator(),
             ["json"] = new JsonTimeSeriesReportGenerator(),
             ["html"] = new HtmlTimeSeriesReportGenerator(),
+            ["graph"] = new HtmlTimeSeriesGraphReportGenerator(),
         };
 
     public static string SupportedFormatsList =>

@@ -1,4 +1,5 @@
 using GitChurnCalculator.Models;
+using System.Text.RegularExpressions;
 
 namespace GitChurnCalculator.Services;
 
@@ -23,7 +24,10 @@ public sealed class ChurnCalculator : IChurnCalculator
         var thirtyDaysAgo = now.AddDays(-30);
         var yearAgo = now.AddDays(-365);
 
-        var trackedFiles = await _gitDataProvider.GetTrackedFilesAsync(repoPath, ct);
+        var trackedFiles = ApplyPathFilters(
+            await _gitDataProvider.GetTrackedFilesAsync(repoPath, ct),
+            options.IncludePattern,
+            options.ExcludePattern);
 
         // Run independent git queries in parallel.
         // When AsOf is set, use date-bounded variants so history is anchored to that point in time.
@@ -163,4 +167,23 @@ public sealed class ChurnCalculator : IChurnCalculator
         var score = changesPerWeek * totalUniqueAuthors * riskMultiplier;
         return Math.Round(score, 4);
     }
+
+    private static IReadOnlyList<string> ApplyPathFilters(
+        IReadOnlyList<string> files,
+        string? includePattern,
+        string? excludePattern)
+    {
+        var include = CreateRegex(includePattern);
+        var exclude = CreateRegex(excludePattern);
+
+        return files
+            .Where(file => include is null || include.IsMatch(file))
+            .Where(file => exclude is null || !exclude.IsMatch(file))
+            .ToList();
+    }
+
+    private static Regex? CreateRegex(string? pattern) =>
+        string.IsNullOrWhiteSpace(pattern)
+            ? null
+            : new Regex(pattern, RegexOptions.CultureInvariant);
 }

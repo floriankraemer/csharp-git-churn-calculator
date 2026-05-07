@@ -73,5 +73,8 @@ public class GoldenChurnReportTests
         Assert.Contains("&lt;repo &amp; test&gt;", html);
         Assert.Contains("src/X.cs", html);
         Assert.Contains("4.6666", html);
+        Assert.Contains("data-sortable=\"true\"", html);
+        Assert.Contains("data-sort-type=\"number\"><button", html);
+        Assert.Contains("querySelectorAll('table[data-sortable=\"true\"]')", html);
     }
 }

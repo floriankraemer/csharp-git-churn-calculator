@@ -1,6 +1,7 @@
 using GitChurnCalculator.Console.Reporting;
 using GitChurnCalculator.Models;
 using GitChurnCalculator.Services;
+using System.Text.RegularExpressions;
 
 namespace GitChurnCalculator.Console.Cli;
 
@@ -20,6 +21,8 @@ public sealed class ChurnAnalysisApp
         string format,
         FileInfo? coverage,
         FileInfo? output,
+        string? include,
+        string? exclude,
         string? series,
         string? from,
         string? to)
@@ -36,22 +39,27 @@ public sealed class ChurnAnalysisApp
             return;
         }
 
+        if (!ValidateRegex(include, "--include") || !ValidateRegex(exclude, "--exclude"))
+            return;
+
         LogAnalysisStart(repo, coverage);
 
         if (series is null)
         {
-            await RunSnapshotAsync(repo, format, coverage, output);
+            await RunSnapshotAsync(repo, format, coverage, output, include, exclude);
             return;
         }
 
-        await RunTimeSeriesAsync(repo, format, coverage, output, series, from, to);
+        await RunTimeSeriesAsync(repo, format, coverage, output, include, exclude, series, from, to);
     }
 
     private async Task RunSnapshotAsync(
         DirectoryInfo repo,
         string format,
         FileInfo? coverage,
-        FileInfo? output)
+        FileInfo? output,
+        string? include,
+        string? exclude)
     {
         if (!ChurnReportGeneratorFactory.TryGet(format, out var generator) || generator is null)
         {
@@ -63,6 +71,8 @@ public sealed class ChurnAnalysisApp
         {
             RepositoryPath = repo.FullName,
             CoverageFilePath = coverage?.FullName,
+            IncludePattern = include,
+            ExcludePattern = exclude,
         };
 
         var results = await _calculator.AnalyzeAsync(options);
@@ -77,6 +87,8 @@ public sealed class ChurnAnalysisApp
         string format,
         FileInfo? coverage,
         FileInfo? output,
+        string? include,
+        string? exclude,
         string series,
         string? from,
         string? to)
@@ -97,7 +109,7 @@ public sealed class ChurnAnalysisApp
         global::System.Console.Error.WriteLine(
             $"Time series mode: {parsed.GranularityLower} chunks from {parsed.From:yyyy-MM-dd} to {parsed.To:yyyy-MM-dd} ({bucketEnds.Count} points).");
 
-        var points = await CollectTimeSeriesPointsAsync(repo, coverage, bucketEnds);
+        var points = await CollectTimeSeriesPointsAsync(repo, coverage, include, exclude, bucketEnds);
         global::System.Console.Error.WriteLine($"Found data across {points.Count} time points.");
 
         var outputText = tsGenerator.Generate(points, repo.FullName);
@@ -107,6 +119,8 @@ public sealed class ChurnAnalysisApp
     private async Task<List<TimeSeriesPoint>> CollectTimeSeriesPointsAsync(
         DirectoryInfo repo,
         FileInfo? coverage,
+        string? include,
+        string? exclude,
         IReadOnlyList<DateTime> bucketEnds)
     {
         var points = new List<TimeSeriesPoint>(bucketEnds.Count);
@@ -117,6 +131,8 @@ public sealed class ChurnAnalysisApp
             {
                 RepositoryPath = repo.FullName,
                 CoverageFilePath = coverage?.FullName,
+                IncludePattern = include,
+                ExcludePattern = exclude,
                 AsOf = asOf,
             };
             var results = await _calculator.AnalyzeAsync(options);
@@ -137,5 +153,22 @@ public sealed class ChurnAnalysisApp
     {
         global::System.Console.Error.WriteLine(message);
         Environment.ExitCode = 1;
+    }
+
+    private static bool ValidateRegex(string? pattern, string optionName)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+            return true;
+
+        try
+        {
+            _ = new Regex(pattern, RegexOptions.CultureInvariant);
+            return true;
+        }
+        catch (ArgumentException ex)
+        {
+            Fail($"Error: Invalid {optionName} regex '{pattern}': {ex.Message}");
+            return false;
+        }
     }
 }

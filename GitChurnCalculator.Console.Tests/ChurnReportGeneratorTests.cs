@@ -52,11 +52,18 @@ public class ChurnReportGeneratorTests
 
         var run = root.GetProperty("runs")[0];
         Assert.Equal("GitChurnCalculator", run.GetProperty("tool").GetProperty("driver").GetProperty("name").GetString());
+        Assert.Contains(
+            run.GetProperty("tool").GetProperty("driver").GetProperty("rules").EnumerateArray(),
+            r => r.GetProperty("id").GetString() == "churn/file-risk"
+        );
 
         var result = run.GetProperty("results")[0];
         Assert.Equal("churn/file-risk", result.GetProperty("ruleId").GetString());
+        Assert.Equal("fail", result.GetProperty("kind").GetString());
         Assert.Equal("note", result.GetProperty("level").GetString());
         Assert.Contains("src/A.cs", result.GetProperty("locations")[0].GetProperty("physicalLocation").GetProperty("artifactLocation").GetProperty("uri").GetString());
+        Assert.True(result.TryGetProperty("properties", out var props));
+        Assert.True(props.TryGetProperty("churnRiskScore", out _));
     }
 
     [Fact]
@@ -65,7 +72,9 @@ public class ChurnReportGeneratorTests
         var gen = new SarifChurnReportGenerator();
         var json = gen.Generate(new[] { SampleFile("x.cs", 15.0) }, "r");
         using var doc = JsonDocument.Parse(json);
-        Assert.Equal("error", doc.RootElement.GetProperty("runs")[0].GetProperty("results")[0].GetProperty("level").GetString());
+        var result = doc.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        Assert.Equal("error", result.GetProperty("level").GetString());
+        Assert.Contains(result.GetProperty("level").GetString(), new[] { "note", "warning", "error", "none" });
     }
 
     [Fact]
@@ -98,5 +107,12 @@ public class ChurnReportGeneratorTests
         Assert.False(TimeSeriesReportGeneratorFactory.TryGet("sarif", out _));
         Assert.False(TimeSeriesReportGeneratorFactory.TryGet("github", out _));
         Assert.False(TimeSeriesReportGeneratorFactory.TryGet("gitlab", out _));
+    }
+
+    [Fact]
+    public void TimeSeriesFactory_SupportsGraphFormat()
+    {
+        Assert.True(TimeSeriesReportGeneratorFactory.TryGet("graph", out var generator));
+        Assert.IsType<HtmlTimeSeriesGraphReportGenerator>(generator);
     }
 }

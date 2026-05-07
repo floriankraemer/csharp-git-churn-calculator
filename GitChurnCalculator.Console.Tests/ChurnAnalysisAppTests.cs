@@ -52,12 +52,75 @@ public class ChurnAnalysisAppTests
             using var repo = new TempRepoDir();
             var outFile = new FileInfo(Path.Combine(repo.Path, "out.csv"));
 
-            await app.HandleAsync(new DirectoryInfo(repo.Path), "csv", null, outFile, null, null, null);
+            await app.HandleAsync(new DirectoryInfo(repo.Path), "csv", null, outFile, null, null, null, null, null);
 
             Assert.Equal(0, Environment.ExitCode);
             Assert.True(outFile.Exists);
             var text = await File.ReadAllTextAsync(outFile.FullName);
             Assert.Contains("src/Example.cs", text);
+        }
+        finally
+        {
+            RestoreExitCode(prev);
+        }
+    }
+
+    [Fact]
+    public async Task Snapshot_WithIncludeExclude_ForwardsPatterns()
+    {
+        var prev = SaveExitCode();
+        try
+        {
+            var fake = new FakeChurnCalculator();
+            fake.Results.Add(OneRow());
+            var app = new ChurnAnalysisApp(fake);
+            using var repo = new TempRepoDir();
+
+            await app.HandleAsync(
+                new DirectoryInfo(repo.Path),
+                "csv",
+                null,
+                null,
+                "^src/",
+                "Generated",
+                null,
+                null,
+                null);
+
+            Assert.Equal(0, Environment.ExitCode);
+            var call = Assert.Single(fake.Calls);
+            Assert.Equal("^src/", call.IncludePattern);
+            Assert.Equal("Generated", call.ExcludePattern);
+        }
+        finally
+        {
+            RestoreExitCode(prev);
+        }
+    }
+
+    [Fact]
+    public async Task Snapshot_InvalidIncludeRegex_SetsExitCodeOne()
+    {
+        var prev = SaveExitCode();
+        try
+        {
+            var fake = new FakeChurnCalculator();
+            var app = new ChurnAnalysisApp(fake);
+            using var repo = new TempRepoDir();
+
+            await app.HandleAsync(
+                new DirectoryInfo(repo.Path),
+                "csv",
+                null,
+                null,
+                "[",
+                null,
+                null,
+                null,
+                null);
+
+            Assert.Equal(1, Environment.ExitCode);
+            Assert.Empty(fake.Calls);
         }
         finally
         {
@@ -74,7 +137,7 @@ public class ChurnAnalysisAppTests
             var app = new ChurnAnalysisApp(new FakeChurnCalculator());
             var missing = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "nonexistent-repo-" + Guid.NewGuid()));
 
-            await app.HandleAsync(missing, "csv", null, null, null, null, null);
+            await app.HandleAsync(missing, "csv", null, null, null, null, null, null, null);
 
             Assert.Equal(1, Environment.ExitCode);
         }
@@ -94,7 +157,7 @@ public class ChurnAnalysisAppTests
             using var repo = new TempRepoDir();
             var cov = new FileInfo(Path.Combine(repo.Path, "missing.xml"));
 
-            await app.HandleAsync(new DirectoryInfo(repo.Path), "csv", cov, null, null, null, null);
+            await app.HandleAsync(new DirectoryInfo(repo.Path), "csv", cov, null, null, null, null, null, null);
 
             Assert.Equal(1, Environment.ExitCode);
         }
@@ -115,7 +178,7 @@ public class ChurnAnalysisAppTests
             var app = new ChurnAnalysisApp(fake);
             using var repo = new TempRepoDir();
 
-            await app.HandleAsync(new DirectoryInfo(repo.Path), "not-a-format", null, null, null, null, null);
+            await app.HandleAsync(new DirectoryInfo(repo.Path), "not-a-format", null, null, null, null, null, null, null);
 
             Assert.Equal(1, Environment.ExitCode);
         }
@@ -139,6 +202,8 @@ public class ChurnAnalysisAppTests
             await app.HandleAsync(
                 new DirectoryInfo(repo.Path),
                 "sarif",
+                null,
+                null,
                 null,
                 null,
                 "week",
@@ -170,6 +235,8 @@ public class ChurnAnalysisAppTests
                 "json",
                 null,
                 outFile,
+                null,
+                null,
                 "week",
                 "2024-01-01",
                 "2024-01-14");

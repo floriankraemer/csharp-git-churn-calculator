@@ -171,6 +171,73 @@ public class TimeSeriesReportGeneratorTests
         Assert.Contains("0 time points", output);
     }
 
+    [Fact]
+    public void GraphTimeSeries_TwoPoints_RendersOneSeriesPerFile()
+    {
+        var generator = new HtmlTimeSeriesGraphReportGenerator();
+        var output = generator.Generate(BuildTwoPoints(), "/my/repo");
+
+        Assert.StartsWith("<!DOCTYPE html>", output.TrimStart());
+        Assert.Contains("Git churn risk graph", output);
+        Assert.Contains("import * as d3", output);
+        Assert.Contains("\"filePath\": \"src/Foo.cs\"", output);
+        Assert.Contains("\"filePath\": \"src/Bar.cs\"", output);
+        Assert.Contains("\"churnRiskScore\": 2", output);
+        Assert.Contains("\"changesPerWeek\": 5", output);
+        Assert.Contains("new ResizeObserver(render).observe(container)", output);
+        Assert.Contains("classed('is-active'", output);
+        Assert.Contains("legend-item", output);
+        Assert.Contains("Changes/week:", output);
+        Assert.Contains("Churn risk:", output);
+    }
+
+    [Fact]
+    public void GraphTimeSeries_EmptyPoints_RendersEmptyState()
+    {
+        var generator = new HtmlTimeSeriesGraphReportGenerator();
+        var output = generator.Generate(Array.Empty<TimeSeriesPoint>(), "repo");
+
+        Assert.Contains("0 time points, 0 top file series", output);
+        Assert.Contains("No graph data to display.", output);
+    }
+
+    [Fact]
+    public void GraphTimeSeries_MoreThanFiftyFiles_RendersTopFiftyOnly()
+    {
+        var files = Enumerable.Range(1, 51)
+            .Select(index => new FileChurnResult
+            {
+                FilePath = $"src/File{index:D2}.cs",
+                TotalCommits = index,
+                FirstCommitDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                LastCommitDate = new DateTime(2024, 1, 7, 0, 0, 0, DateTimeKind.Utc),
+                AgeDays = 7,
+                ChangesPerWeek = index,
+                ChangesPerMonth = index,
+                ChangesPerYear = index,
+                CommitsLast7Days = index,
+                CommitsLast30Days = index,
+                CommitsLast365Days = index,
+                TotalUniqueAuthors = 1,
+                UniqueAuthorsLast7Days = 1,
+                UniqueAuthorsLast30Days = 1,
+                UniqueAuthorsLast365Days = 1,
+                CoveragePercent = null,
+                ChurnRiskScore = index,
+            })
+            .ToArray();
+
+        var generator = new HtmlTimeSeriesGraphReportGenerator();
+        var output = generator.Generate(
+            new[] { new TimeSeriesPoint { AsOf = new DateTime(2024, 1, 7), Files = files } },
+            "repo");
+
+        Assert.Contains("50 top file series", output);
+        Assert.Contains("\"filePath\": \"src/File51.cs\"", output);
+        Assert.Contains("\"filePath\": \"src/File02.cs\"", output);
+        Assert.DoesNotContain("\"filePath\": \"src/File01.cs\"", output);
+    }
+
     private static int CountOccurrences(string source, string value)
     {
         var count = 0;

@@ -18,9 +18,11 @@ dotnet run --project GitChurnCalculator.Console -- <repo-path> [options]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `<repo-path>` | *(required)* | Path to the git repository to analyze |
-| `--format <csv\|json\|html>` | `csv` | Output format (`html` = Bootstrap-styled table page) |
+| `--format <csv\|json\|html\|graph>` | `csv` | Output format (`html` = Bootstrap-styled table page, `graph` = D3 time-series chart) |
 | `--coverage <path>` | *(none)* | Path to a Cobertura XML coverage file |
 | `--output <path>` | stdout | Write output to a file instead of stdout |
+| `--include <regex>` | *(none)* | Only include repo-relative file paths matching this regular expression |
+| `--exclude <regex>` | *(none)* | Exclude repo-relative file paths matching this regular expression |
 | `--series <week\|month>` | *(none)* | Produce a time series by stepping in week or month chunks. Requires `--from`. |
 | `--from <yyyy-MM-dd>` | *(none)* | Start date for time series (inclusive). Required when `--series` is used. |
 | `--to <yyyy-MM-dd>` | today | End date for time series (inclusive). Defaults to today when `--series` is used. |
@@ -51,6 +53,13 @@ HTML table report (Bootstrap via CDN; open the file in a browser):
 dotnet run --project GitChurnCalculator.Console -- /path/to/repo --format html --output churn.html
 ```
 
+Limit analysis to selected paths:
+
+```bash
+dotnet run --project GitChurnCalculator.Console -- /path/to/repo \
+  --include "^(src|tests)/.*\\.cs$" --exclude "(bin|obj|coverage-report)/"
+```
+
 ### Time series
 
 Produce a weekly time series for a date range and save as JSON:
@@ -69,7 +78,17 @@ dotnet run --project GitChurnCalculator.Console -- /path/to/repo \
   --format html --output series.html
 ```
 
+D3 multi-line graph with one line per top-risk file:
+
+```bash
+dotnet run --project GitChurnCalculator.Console -- /path/to/repo \
+  --series week --from 2024-01-01 \
+  --format graph --output churn-graph.html
+```
+
 Time series output includes all the same per-file columns as the single-snapshot report, with an additional `AsOf` column (CSV) or `asOf` field (JSON) identifying the bucket end date. Each time point's metrics — including rolling windows like `CommitsLast7Days` — are calculated relative to that point's date, not the current date. The `--format` flag selects the format for both single-snapshot and time series modes.
+
+The `graph` format draws only the top 50 file series, ranked by each file's highest churn risk score across the selected time range. Hovering a line or file label shows the file path, nearest date, churn risk score, and change frequency.
 
 ## Output Fields
 

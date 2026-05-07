@@ -42,6 +42,7 @@ public sealed class SarifChurnReportGenerator : IChurnReportGenerator
             Results = results.Select(r => new SarifResult
             {
                 RuleId = RuleId,
+                Kind = "fail",
                 Level = ChurnCiSeverity.SarifLevel(r.ChurnRiskScore),
                 Message = new SarifText { Text = ChurnCiSeverity.BuildMessage(r) },
                 Locations =
@@ -58,6 +59,14 @@ public sealed class SarifChurnReportGenerator : IChurnReportGenerator
                         },
                     },
                 ],
+                Properties = new Dictionary<string, object?>
+                {
+                    ["churnRiskScore"] = r.ChurnRiskScore,
+                    ["totalCommits"] = r.TotalCommits,
+                    ["totalUniqueAuthors"] = r.TotalUniqueAuthors,
+                    ["coveragePercent"] = r.CoveragePercent,
+                    ["changesPerWeek"] = r.ChangesPerWeek,
+                },
             }).ToList(),
         };
 
@@ -123,11 +132,15 @@ internal sealed class SarifResult
 {
     public string RuleId { get; init; } = "";
 
+    public string Kind { get; init; } = "";
+
     public string Level { get; init; } = "";
 
     public SarifText Message { get; init; } = new();
 
     public List<SarifLocation> Locations { get; init; } = [];
+
+    public Dictionary<string, object?>? Properties { get; init; }
 }
 
 internal sealed class SarifLocation

@@ -140,6 +140,58 @@ public class ChurnCalculatorTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_WithIncludeAndExcludePatterns_FiltersTrackedFiles()
+    {
+        var gitProvider = Substitute.For<IGitDataProvider>();
+        var coverageParser = Substitute.For<ICoverageParser>();
+        var repoPath = "/fake/repo";
+
+        gitProvider.GetTrackedFilesAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new List<string> { "src/A.cs", "tests/A.cs", "src/Generated.cs" });
+
+        var commitCounts = new Dictionary<string, int>
+        {
+            ["src/A.cs"] = 10,
+            ["tests/A.cs"] = 10,
+            ["src/Generated.cs"] = 10,
+        };
+        gitProvider.GetCommitCountsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(commitCounts);
+
+        var now = DateTime.UtcNow;
+        var dates = new Dictionary<string, DateTime>
+        {
+            ["src/A.cs"] = now.AddDays(-14),
+            ["tests/A.cs"] = now.AddDays(-14),
+            ["src/Generated.cs"] = now.AddDays(-14),
+        };
+        gitProvider.GetFirstCommitDatesAsync(repoPath, Arg.Any<CancellationToken>()).Returns(dates);
+        gitProvider.GetLastCommitDatesAsync(repoPath, Arg.Any<CancellationToken>()).Returns(dates);
+
+        var authors = new Dictionary<string, int>
+        {
+            ["src/A.cs"] = 1,
+            ["tests/A.cs"] = 1,
+            ["src/Generated.cs"] = 1,
+        };
+        gitProvider.GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(authors);
+
+        var empty = new Dictionary<string, int>();
+        gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
+        gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
+
+        var calculator = new ChurnCalculator(gitProvider, coverageParser);
+        var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions
+        {
+            RepositoryPath = repoPath,
+            IncludePattern = "^src/",
+            ExcludePattern = "Generated",
+        });
+
+        var result = Assert.Single(results);
+        Assert.Equal("src/A.cs", result.FilePath);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_WithCoverage_AppliesRiskMultiplier()
     {
         var gitProvider = Substitute.For<IGitDataProvider>();

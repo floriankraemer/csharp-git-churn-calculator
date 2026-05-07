@@ -4,6 +4,8 @@ public sealed class ChurnAnalysisOptions
 {
     public required string RepositoryPath { get; init; }
     public string? CoverageFilePath { get; init; }
+    public string? IncludePattern { get; init; }
+    public string? ExcludePattern { get; init; }
 
     /// <summary>
     /// When set, the analysis treats this date as "now": all git queries are bounded

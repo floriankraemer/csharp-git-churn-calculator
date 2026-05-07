@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using GitChurnCalculator.Console.Reporting;
 
 namespace GitChurnCalculator.Console.Cli;
@@ -14,7 +15,7 @@ public static class ChurnCliRootCommand
         var formatOption = new Option<string>(
             "--format",
             getDefaultValue: () => "csv",
-            description: $"Output format: {ChurnReportGeneratorFactory.SupportedFormatsList}");
+            description: $"Output format: {ChurnReportGeneratorFactory.SupportedFormatsList}. Time series also supports graph.");
 
         var coverageOption = new Option<FileInfo?>(
             "--coverage",
@@ -23,6 +24,14 @@ public static class ChurnCliRootCommand
         var outputOption = new Option<FileInfo?>(
             "--output",
             description: "Output file path (defaults to stdout)");
+
+        var includeOption = new Option<string?>(
+            "--include",
+            description: "Only include repo-relative file paths matching this regular expression.");
+
+        var excludeOption = new Option<string?>(
+            "--exclude",
+            description: "Exclude repo-relative file paths matching this regular expression.");
 
         var seriesOption = new Option<string?>(
             "--series",
@@ -42,28 +51,27 @@ public static class ChurnCliRootCommand
             formatOption,
             coverageOption,
             outputOption,
+            includeOption,
+            excludeOption,
             seriesOption,
             fromOption,
             toOption,
         };
 
-        rootCommand.SetHandler(
-            async (
-                DirectoryInfo repo,
-                string format,
-                FileInfo? coverage,
-                FileInfo? output,
-                string? series,
-                string? from,
-                string? to) =>
-                await app.HandleAsync(repo, format, coverage, output, series, from, to),
-            repoArgument,
-            formatOption,
-            coverageOption,
-            outputOption,
-            seriesOption,
-            fromOption,
-            toOption);
+        rootCommand.SetHandler(async context =>
+        {
+            var repo = context.ParseResult.GetValueForArgument(repoArgument);
+            var format = context.ParseResult.GetValueForOption(formatOption) ?? "csv";
+            var coverage = context.ParseResult.GetValueForOption(coverageOption);
+            var output = context.ParseResult.GetValueForOption(outputOption);
+            var include = context.ParseResult.GetValueForOption(includeOption);
+            var exclude = context.ParseResult.GetValueForOption(excludeOption);
+            var series = context.ParseResult.GetValueForOption(seriesOption);
+            var from = context.ParseResult.GetValueForOption(fromOption);
+            var to = context.ParseResult.GetValueForOption(toOption);
+
+            await app.HandleAsync(repo, format, coverage, output, include, exclude, series, from, to);
+        });
 
         return rootCommand;
     }
