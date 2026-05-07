@@ -1,6 +1,6 @@
 # Git Churn Calculator
 
-A .NET 8 tool that calculates a **Churn Risk Score** for every file in a git repository by combining change frequency, author spread, and optional test coverage data.
+It calculates a **Churn Risk Score** for every file in a git repository by combining change frequency, author spread, and optional test coverage data.
 
 ## Documentation
 
