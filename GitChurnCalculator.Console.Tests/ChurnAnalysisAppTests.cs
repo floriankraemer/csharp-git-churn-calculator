@@ -13,6 +13,8 @@ public class ChurnAnalysisAppTests
         {
             FilePath = "src/Example.cs",
             TotalCommits = 12,
+            LinesAdded = 0,
+            LinesRemoved = 0,
             FirstCommitDate = d.AddDays(-20),
             LastCommitDate = d,
             AgeDays = 20,

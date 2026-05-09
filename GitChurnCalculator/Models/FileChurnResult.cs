@@ -4,6 +4,8 @@ public sealed class FileChurnResult
 {
     public required string FilePath { get; init; }
     public int TotalCommits { get; init; }
+    public int LinesAdded { get; init; }
+    public int LinesRemoved { get; init; }
     public DateTime? FirstCommitDate { get; init; }
     public DateTime? LastCommitDate { get; init; }
     public int AgeDays { get; init; }

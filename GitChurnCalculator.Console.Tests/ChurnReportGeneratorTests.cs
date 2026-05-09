@@ -13,6 +13,8 @@ public class ChurnReportGeneratorTests
         {
             FilePath = path,
             TotalCommits = 5,
+            LinesAdded = 0,
+            LinesRemoved = 0,
             FirstCommitDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             LastCommitDate = new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc),
             AgeDays = 14,
