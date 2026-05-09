@@ -6,6 +6,25 @@ namespace GitChurnCalculator.Console.Tests;
 public class TimeSeriesCliTests
 {
     [Fact]
+    public void BucketEndCalculator_FromEqualsTo_ReturnsThatDate()
+    {
+        var d = new DateTime(2024, 6, 10);
+        var ends = TimeSeriesBucketEndCalculator.BuildEnds(d, d, "week");
+        Assert.Single(ends);
+        Assert.Equal(d, ends[0]);
+    }
+
+    [Fact]
+    public void BucketEndCalculator_Month_AlwaysIncludesToAsLast()
+    {
+        var from = new DateTime(2024, 1, 5);
+        var to = new DateTime(2024, 3, 18);
+        var ends = TimeSeriesBucketEndCalculator.BuildEnds(from, to, "month");
+        Assert.Equal(to, ends[^1]);
+        Assert.Contains(new DateTime(2024, 2, 5), ends);
+    }
+
+    [Fact]
     public void TimeSeriesArguments_MissingFrom_ReturnsFalse()
     {
         var ok = TimeSeriesArguments.TryValidate("week", null, null, out var err, out var v);

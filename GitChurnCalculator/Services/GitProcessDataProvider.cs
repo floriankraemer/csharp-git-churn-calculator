@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using GitChurnCalculator.Models;
 
 namespace GitChurnCalculator.Services;
 
@@ -176,6 +177,57 @@ public sealed class GitProcessDataProvider : IGitDataProvider
 
         return fileAuthors.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal);
     }
+
+    public async Task<Dictionary<string, LineChangeTotals>> GetLineChangeTotalsAsync(string repoPath, CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(repoPath, NumstatLogArgs(""), ct);
+        return ParseLineChangeTotalsFromNumstatLog(output);
+    }
+
+    public async Task<Dictionary<string, LineChangeTotals>> GetLineChangeTotalsUntilAsync(
+        string repoPath,
+        DateTime until,
+        CancellationToken ct = default)
+    {
+        var output = await RunGitAsync(repoPath, NumstatLogArgs(UntilClause(until)), ct);
+        return ParseLineChangeTotalsFromNumstatLog(output);
+    }
+
+    /// <summary>
+    /// Parses <c>git log --numstat</c> output: lines are <c>added\\tremoved\\tpath</c>. Binary rows use <c>-</c> for counts.
+    /// </summary>
+    public static Dictionary<string, LineChangeTotals> ParseLineChangeTotalsFromNumstatLog(string output)
+    {
+        var totals = new Dictionary<string, LineChangeTotals>(StringComparer.Ordinal);
+
+        foreach (var raw in output.Split('\n'))
+        {
+            if (raw.Length == 0)
+                continue;
+
+            var parts = raw.Split('\t', 3, StringSplitOptions.None);
+            if (parts.Length != 3)
+                continue;
+
+            var path = parts[2].Trim();
+            if (path.Length == 0)
+                continue;
+
+            var addedCol = parts[0].Trim();
+            var removedCol = parts[1].Trim();
+
+            var added = int.TryParse(addedCol, NumberStyles.Integer, CultureInfo.InvariantCulture, out var a) ? a : 0;
+            var removed = int.TryParse(removedCol, NumberStyles.Integer, CultureInfo.InvariantCulture, out var d) ? d : 0;
+
+            totals.TryGetValue(path, out var cur);
+            totals[path] = new LineChangeTotals(cur.Added + added, cur.Removed + removed);
+        }
+
+        return totals;
+    }
+
+    private static string NumstatLogArgs(string dateClause) =>
+        $"-c core.quotepath=false log{dateClause} --pretty=format: --numstat";
 
     private static string FormatLogDate(DateTime value) =>
         value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

@@ -57,7 +57,7 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
             sb.AppendLine("      <div class=\"card-body position-relative\">");
             sb.AppendLine("        <div id=\"churn-graph\"></div>");
             sb.AppendLine("        <div id=\"churn-tooltip\" class=\"graph-tooltip d-none\"></div>");
-            sb.AppendLine("        <p class=\"small text-secondary mb-0 mt-3\">Hover a line or file label to highlight one file. Y-axis shows churn risk score.</p>");
+            sb.AppendLine("        <p class=\"small text-secondary mb-0 mt-3\">Hover a line or file label to highlight one file. Y-axis shows churn risk score. The tooltip lists coverage, cumulative lines added and removed (per <code class=\"small\">git log --numstat</code>), averages at the hovered snapshot (lines committed per merge count), and when the graph has multiple time steps averages of line deltas between successive steps.</p>");
             sb.AppendLine("      </div>");
             sb.AppendLine("    </div>");
         }
@@ -78,18 +78,53 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
             .OrderByDescending(group => group.Max(item => item.File.ChurnRiskScore))
             .ThenBy(group => group.Key, StringComparer.Ordinal)
             .Take(TopFileLimit)
-            .Select(group => new TimeSeriesGraphSeries
+            .Select(group =>
             {
-                FilePath = group.Key,
-                Points = group
-                    .OrderBy(item => item.AsOf)
-                    .Select(item => new TimeSeriesGraphPoint
+                var ordered = group.OrderBy(item => item.AsOf).ToList();
+
+                double? avgDeltaAdded = null;
+                double? avgDeltaRemoved = null;
+                if (ordered.Count >= 2)
+                {
+                    var sumAdded = 0L;
+                    var sumRemoved = 0L;
+                    for (var i = 1; i < ordered.Count; i++)
                     {
-                        Date = item.AsOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                        ChurnRiskScore = item.File.ChurnRiskScore,
-                        ChangesPerWeek = item.File.ChangesPerWeek,
-                    })
-                    .ToArray(),
+                        sumAdded += ordered[i].File.LinesAdded - ordered[i - 1].File.LinesAdded;
+                        sumRemoved += ordered[i].File.LinesRemoved - ordered[i - 1].File.LinesRemoved;
+                    }
+
+                    var n = ordered.Count - 1;
+                    avgDeltaAdded = Math.Round(sumAdded / (double)n, 2);
+                    avgDeltaRemoved = Math.Round(sumRemoved / (double)n, 2);
+                }
+
+                return new TimeSeriesGraphSeries
+                {
+                    FilePath = group.Key,
+                    AvgDeltaLinesAddedPerBucket = avgDeltaAdded,
+                    AvgDeltaLinesRemovedPerBucket = avgDeltaRemoved,
+                    Points = ordered
+                        .Select(item =>
+                        {
+                            var f = item.File;
+                            int tc = f.TotalCommits;
+                            return new TimeSeriesGraphPoint
+                            {
+                                Date = item.AsOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                                ChurnRiskScore = f.ChurnRiskScore,
+                                ChangesPerWeek = f.ChangesPerWeek,
+                                LinesAdded = f.LinesAdded,
+                                LinesRemoved = f.LinesRemoved,
+                                CoveragePercent = f.CoveragePercent,
+                                LinesAddedAvgPerCommit =
+                                    tc > 0 ? Math.Round((double)f.LinesAdded / tc, 2) : null,
+                                LinesRemovedAvgPerCommit =
+                                    tc > 0 ? Math.Round((double)f.LinesRemoved / tc, 2) : null,
+                            };
+                        })
+                        .ToArray(),
+                };
             })
             .ToArray();
     }
@@ -103,7 +138,7 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
         sb.AppendLine("    .graph-line:hover, .graph-line.is-active { stroke-width: 3; stroke-opacity: 1; }");
         sb.AppendLine("    .legend-item { cursor: default; }");
         sb.AppendLine("    .legend-item:hover .legend-label, .legend-item.is-active .legend-label { font-weight: 600; fill: #212529; }");
-        sb.AppendLine("    .graph-tooltip { position: fixed; pointer-events: none; max-width: 420px; padding: 0.5rem 0.75rem; color: #fff; background: rgba(33, 37, 41, 0.95); border-radius: 0.375rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); font-size: 0.875rem; z-index: 1080; }");
+        sb.AppendLine("    .graph-tooltip { position: fixed; pointer-events: none; max-width: 440px; padding: 0.5rem 0.75rem; color: #fff; background: rgba(33, 37, 41, 0.95); border-radius: 0.375rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); font-size: 0.875rem; z-index: 1080; line-height: 1.35; }");
         sb.AppendLine("    .graph-tooltip code { color: #f8f9fa; }");
         sb.AppendLine("    .axis-label, .legend-label { fill: #495057; font-size: 12px; }");
         sb.AppendLine("    .grid line { stroke: #dee2e6; stroke-opacity: 0.8; shape-rendering: crispEdges; }");
@@ -120,10 +155,17 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
         sb.AppendLine("      const parseDate = d3.timeParse('%Y-%m-%d');");
         sb.AppendLine("      const data = series.map((line) => ({");
         sb.AppendLine("        filePath: line.filePath,");
+        sb.AppendLine("        avgDeltaLinesAddedPerBucket: line.avgDeltaLinesAddedPerBucket ?? null,");
+        sb.AppendLine("        avgDeltaLinesRemovedPerBucket: line.avgDeltaLinesRemovedPerBucket ?? null,");
         sb.AppendLine("        points: line.points.map((point) => ({");
         sb.AppendLine("          date: parseDate(point.date),");
         sb.AppendLine("          value: point.churnRiskScore,");
-        sb.AppendLine("          changesPerWeek: point.changesPerWeek");
+        sb.AppendLine("          changesPerWeek: point.changesPerWeek,");
+        sb.AppendLine("          linesAdded: point.linesAdded,");
+        sb.AppendLine("          linesRemoved: point.linesRemoved,");
+        sb.AppendLine("          coveragePercent: point.coveragePercent ?? null,");
+        sb.AppendLine("          linesAddedAvgPerCommit: point.linesAddedAvgPerCommit ?? null,");
+        sb.AppendLine("          linesRemovedAvgPerCommit: point.linesRemovedAvgPerCommit ?? null");
         sb.AppendLine("        }))");
         sb.AppendLine("      }));");
         sb.AppendLine("      const container = document.querySelector('#churn-graph');");
@@ -134,6 +176,9 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
         sb.AppendLine("      const bisectDate = d3.bisector((point) => point.date).left;");
         sb.AppendLine("      const formatScore = d3.format(',.4f');");
         sb.AppendLine("      const formatFrequency = d3.format(',.2f');");
+        sb.AppendLine("      const formatInt = d3.format(',');");
+        sb.AppendLine("      const formatMaybe2 = (x) => (x == null || Number.isNaN(x) ? '—' : d3.format('.2f')(x));");
+        sb.AppendLine("      const formatCoverage = (x) => (x == null || Number.isNaN(x) ? '—' : `${d3.format('.2f')(x)}%`);");
         sb.AppendLine("      const escapeHtml = (value) => String(value)");
         sb.AppendLine("        .replace(/&/g, '&amp;')");
         sb.AppendLine("        .replace(/</g, '&lt;')");
@@ -156,9 +201,33 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
         sb.AppendLine("        const mouseX = xScale ? d3.pointer(event, svg.node())[0] : null;");
         sb.AppendLine("        const point = nearestPoint(lineData.points, xScale ? xScale.invert(mouseX) : null);");
         sb.AppendLine("        const date = d3.timeFormat('%Y-%m-%d')(point.date);");
+        sb.AppendLine("        const seriesAvgAdded = formatMaybe2(lineData.avgDeltaLinesAddedPerBucket);");
+        sb.AppendLine("        const seriesAvgRemoved = formatMaybe2(lineData.avgDeltaLinesRemovedPerBucket);");
+        sb.AppendLine("        const perCommitAvg = (");
+        sb.AppendLine("          point.linesAddedAvgPerCommit != null && point.linesRemovedAvgPerCommit != null");
+        sb.AppendLine("            ? `<div>Avg lines added/commit: ${formatMaybe2(point.linesAddedAvgPerCommit)}</div>`");
+        sb.AppendLine("              + `<div>Avg lines removed/commit: ${formatMaybe2(point.linesRemovedAvgPerCommit)}</div>`");
+        sb.AppendLine("            : ''");
+        sb.AppendLine("        );");
+        sb.AppendLine("        const seriesAvgHtml = lineData.avgDeltaLinesAddedPerBucket !== null && lineData.avgDeltaLinesRemovedPerBucket !== null ?");
+        sb.AppendLine("          '<div style=\"height:1px;background:rgba(255,255,255,0.22);margin:0.38rem 0\"></div>'");
+        sb.AppendLine("          + '<div style=\"opacity:0.9;font-size:0.8125rem\">Across time series (Δ between plotted steps)</div>'");
+        sb.AppendLine("          + `<div>Avg Δ lines added: ${seriesAvgAdded}</div>`");
+        sb.AppendLine("          + `<div>Avg Δ lines removed: ${seriesAvgRemoved}</div>`");
+        sb.AppendLine("          : '';");
         sb.AppendLine("        tooltip");
         sb.AppendLine("          .classed('d-none', false)");
-        sb.AppendLine("          .html(`<div><code>${escapeHtml(lineData.filePath)}</code></div><div>Date: ${date}</div><div>Churn risk: ${formatScore(point.value)}</div><div>Changes/week: ${formatFrequency(point.changesPerWeek)}</div>`)");
+        sb.AppendLine("          .html(");
+        sb.AppendLine("            `<div><code>${escapeHtml(lineData.filePath)}</code></div>`");
+        sb.AppendLine("            + `<div>Date: ${date}</div>`");
+        sb.AppendLine("            + `<div>Churn risk: ${formatScore(point.value)}</div>`");
+        sb.AppendLine("            + `<div>Changes/week: ${formatFrequency(point.changesPerWeek)}</div>`");
+        sb.AppendLine("            + `<div>Coverage: ${formatCoverage(point.coveragePercent)}</div>`");
+        sb.AppendLine("            + `<div>Lines added (cum.): ${formatInt(point.linesAdded)}</div>`");
+        sb.AppendLine("            + `<div>Lines removed (cum.): ${formatInt(point.linesRemoved)}</div>`");
+        sb.AppendLine("            + perCommitAvg");
+        sb.AppendLine("            + seriesAvgHtml");
+        sb.AppendLine("          )");
         sb.AppendLine("          .style('left', `${event.clientX + 14}px`)");
         sb.AppendLine("          .style('top', `${event.clientY + 14}px`);");
         sb.AppendLine("      };");
@@ -246,6 +315,8 @@ public sealed class HtmlTimeSeriesGraphReportGenerator : ITimeSeriesReportGenera
 internal sealed class TimeSeriesGraphSeries
 {
     public required string FilePath { get; init; }
+    public double? AvgDeltaLinesAddedPerBucket { get; init; }
+    public double? AvgDeltaLinesRemovedPerBucket { get; init; }
     public required IReadOnlyList<TimeSeriesGraphPoint> Points { get; init; }
 }
 
@@ -254,4 +325,9 @@ internal sealed class TimeSeriesGraphPoint
     public required string Date { get; init; }
     public double ChurnRiskScore { get; init; }
     public double ChangesPerWeek { get; init; }
+    public int LinesAdded { get; init; }
+    public int LinesRemoved { get; init; }
+    public double? CoveragePercent { get; init; }
+    public double? LinesAddedAvgPerCommit { get; init; }
+    public double? LinesRemovedAvgPerCommit { get; init; }
 }

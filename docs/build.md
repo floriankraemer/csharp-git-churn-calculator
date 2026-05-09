@@ -88,3 +88,27 @@ dotnet tool run reportgenerator -- \
   -targetdir:artifacts/coverage/html \
   -reporttypes:Html
 ```
+
+## Mutation testing ([Stryker.NET](https://learn.microsoft.com/en-us/dotnet/core/testing/mutation-testing))
+
+Mutation testing checks whether unit tests would catch small intentional bugs in production code. This repo scopes runs to **critical churn / coverage / CI mapping** surface area only (see `stryker-config.json` next to each production project — `GitChurnCalculator` and `GitChurnCalculator.Console` — which points `test-projects` at the matching test assembly), not every `.cs` file.
+
+**Container** (recommended — the dev image installs `dotnet-stryker` globally):
+
+```bash
+make mutation-test
+```
+
+HTML reports are written under each **production** project as **`StrykerOutput/<timestamp>/reports/mutation-report.html`** (ignored via `**/StrykerOutput/` in [.gitignore](../.gitignore)). Stryker is started from those folders so the project under test is not resolved via reference-only (ref) assemblies from the test project. The log line `Your html report has been generated at:` shows the exact path for each run.
+
+**Host** (uses the [local tool manifest](../.config/dotnet-tools.json) after `dotnet tool restore`):
+
+```bash
+dotnet tool restore
+cd GitChurnCalculator && dotnet tool run dotnet-stryker
+cd GitChurnCalculator.Console && dotnet tool run dotnet-stryker
+```
+
+Interpret **survived** mutants as prompts to add or strengthen tests; see the [Stryker.NET configuration docs](https://stryker-mutator.io/docs/stryker-net/configuration/) to adjust `mutate`, `report-file-name`, thresholds, reporters, or verbosity.
+
+Stryker.NET 4.x does not support `artifact-folder` in `stryker-config.json`; output location follows the working directory and `report-file-name` defaults.

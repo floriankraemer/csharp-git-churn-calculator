@@ -9,10 +9,12 @@ public class TimeSeriesReportGeneratorTests
 {
     private static IReadOnlyList<TimeSeriesPoint> BuildTwoPoints()
     {
-        var file1 = new FileChurnResult
+        var fooEarly = new FileChurnResult
         {
             FilePath = "src/Foo.cs",
             TotalCommits = 10,
+            LinesAdded = 40,
+            LinesRemoved = 12,
             FirstCommitDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             LastCommitDate = new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc),
             AgeDays = 14,
@@ -26,14 +28,16 @@ public class TimeSeriesReportGeneratorTests
             UniqueAuthorsLast7Days = 1,
             UniqueAuthorsLast30Days = 2,
             UniqueAuthorsLast365Days = 2,
-            CoveragePercent = 80.0,
-            ChurnRiskScore = 2.0,
+            CoveragePercent = 80.12,
+            ChurnRiskScore = 4.0,
         };
 
-        var file2 = new FileChurnResult
+        var barEarly = new FileChurnResult
         {
             FilePath = "src/Bar.cs",
             TotalCommits = 5,
+            LinesAdded = 10,
+            LinesRemoved = 4,
             FirstCommitDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             LastCommitDate = new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc),
             AgeDays = 14,
@@ -48,13 +52,59 @@ public class TimeSeriesReportGeneratorTests
             UniqueAuthorsLast30Days = 1,
             UniqueAuthorsLast365Days = 1,
             CoveragePercent = null,
-            ChurnRiskScore = 2.5,
+            ChurnRiskScore = 2.6,
+        };
+
+        var fooLate = new FileChurnResult
+        {
+            FilePath = fooEarly.FilePath,
+            TotalCommits = fooEarly.TotalCommits,
+            LinesAdded = 100,
+            LinesRemoved = 50,
+            FirstCommitDate = fooEarly.FirstCommitDate,
+            LastCommitDate = new DateTime(2024, 1, 20, 0, 0, 0, DateTimeKind.Utc),
+            AgeDays = fooEarly.AgeDays,
+            ChangesPerWeek = fooEarly.ChangesPerWeek,
+            ChangesPerMonth = fooEarly.ChangesPerMonth,
+            ChangesPerYear = fooEarly.ChangesPerYear,
+            CommitsLast7Days = fooEarly.CommitsLast7Days,
+            CommitsLast30Days = fooEarly.CommitsLast30Days,
+            CommitsLast365Days = fooEarly.CommitsLast365Days,
+            TotalUniqueAuthors = fooEarly.TotalUniqueAuthors,
+            UniqueAuthorsLast7Days = fooEarly.UniqueAuthorsLast7Days,
+            UniqueAuthorsLast30Days = fooEarly.UniqueAuthorsLast30Days,
+            UniqueAuthorsLast365Days = fooEarly.UniqueAuthorsLast365Days,
+            CoveragePercent = fooEarly.CoveragePercent,
+            ChurnRiskScore = 4.2,
+        };
+
+        var barLate = new FileChurnResult
+        {
+            FilePath = barEarly.FilePath,
+            TotalCommits = barEarly.TotalCommits,
+            LinesAdded = 30,
+            LinesRemoved = 10,
+            FirstCommitDate = barEarly.FirstCommitDate,
+            LastCommitDate = barEarly.LastCommitDate,
+            AgeDays = barEarly.AgeDays,
+            ChangesPerWeek = barEarly.ChangesPerWeek,
+            ChangesPerMonth = barEarly.ChangesPerMonth,
+            ChangesPerYear = barEarly.ChangesPerYear,
+            CommitsLast7Days = barEarly.CommitsLast7Days,
+            CommitsLast30Days = barEarly.CommitsLast30Days,
+            CommitsLast365Days = barEarly.CommitsLast365Days,
+            TotalUniqueAuthors = barEarly.TotalUniqueAuthors,
+            UniqueAuthorsLast7Days = barEarly.UniqueAuthorsLast7Days,
+            UniqueAuthorsLast30Days = barEarly.UniqueAuthorsLast30Days,
+            UniqueAuthorsLast365Days = barEarly.UniqueAuthorsLast365Days,
+            CoveragePercent = barEarly.CoveragePercent,
+            ChurnRiskScore = 3.2,
         };
 
         return new List<TimeSeriesPoint>
         {
-            new() { AsOf = new DateTime(2024, 1, 7, 0, 0, 0, DateTimeKind.Utc), Files = new[] { file1 } },
-            new() { AsOf = new DateTime(2024, 1, 14, 0, 0, 0, DateTimeKind.Utc), Files = new[] { file2 } },
+            new() { AsOf = new DateTime(2024, 1, 7, 0, 0, 0, DateTimeKind.Utc), Files = new[] { fooEarly, barEarly } },
+            new() { AsOf = new DateTime(2024, 1, 14, 0, 0, 0, DateTimeKind.Utc), Files = new[] { fooLate, barLate } },
         };
     }
 
@@ -71,14 +121,12 @@ public class TimeSeriesReportGeneratorTests
         // Header contains AsOf as first column
         Assert.StartsWith("AsOf,File,", lines[0]);
 
-        // One data row per (asOf, file) pair — 2 time points × 1 file each = 2 rows + 1 header
-        Assert.Equal(3, lines.Length);
+        Assert.Equal(5, lines.Length);
 
-        // First data row starts with the first asOf date
         Assert.StartsWith("2024-01-07,", lines[1]);
-
-        // Second data row uses the second asOf date
-        Assert.StartsWith("2024-01-14,", lines[2]);
+        Assert.StartsWith("2024-01-07,", lines[2]);
+        Assert.StartsWith("2024-01-14,", lines[3]);
+        Assert.StartsWith("2024-01-14,", lines[4]);
     }
 
     [Fact]
@@ -112,11 +160,15 @@ public class TimeSeriesReportGeneratorTests
 
         Assert.True(firstPoint.TryGetProperty("files", out var filesProp));
         Assert.Equal(JsonValueKind.Array, filesProp.ValueKind);
-        Assert.Equal(1, filesProp.GetArrayLength());
+        Assert.Equal(2, filesProp.GetArrayLength());
 
         var firstFile = filesProp[0];
         Assert.True(firstFile.TryGetProperty("filePath", out var pathProp));
         Assert.Equal("src/Foo.cs", pathProp.GetString());
+        Assert.Equal("src/Bar.cs", filesProp[1].GetProperty("filePath").GetString());
+
+        var secondBucket = root[1].GetProperty("files");
+        Assert.Equal(2, secondBucket.GetArrayLength());
     }
 
     [Fact]
@@ -182,11 +234,22 @@ public class TimeSeriesReportGeneratorTests
         Assert.Contains("import * as d3", output);
         Assert.Contains("\"filePath\": \"src/Foo.cs\"", output);
         Assert.Contains("\"filePath\": \"src/Bar.cs\"", output);
-        Assert.Contains("\"churnRiskScore\": 2", output);
+        Assert.Contains("\"churnRiskScore\": 2.6", output);
+        Assert.Contains("\"churnRiskScore\": 3.2", output);
+        Assert.Contains("\"churnRiskScore\": 4.2", output);
         Assert.Contains("\"changesPerWeek\": 5", output);
+        Assert.Contains("\"linesAdded\": 100,", output);
+        Assert.Contains("\"avgDeltaLinesAddedPerBucket\": 60,", output);
+        Assert.Contains("\"avgDeltaLinesAddedPerBucket\": 20,", output);
+        Assert.Contains("\"coveragePercent\": 80.12,", output);
+        Assert.Contains("\"linesAddedAvgPerCommit\": 10,", output);
         Assert.Contains("new ResizeObserver(render).observe(container)", output);
         Assert.Contains("classed('is-active'", output);
         Assert.Contains("legend-item", output);
+        Assert.Contains("Coverage:", output);
+        Assert.Contains("Lines added (cum.):", output);
+        Assert.Contains("Avg Δ lines added:", output);
+        Assert.Contains("Across time series (Δ between plotted steps)", output);
         Assert.Contains("Changes/week:", output);
         Assert.Contains("Churn risk:", output);
     }
@@ -209,6 +272,8 @@ public class TimeSeriesReportGeneratorTests
             {
                 FilePath = $"src/File{index:D2}.cs",
                 TotalCommits = index,
+                LinesAdded = 0,
+                LinesRemoved = 0,
                 FirstCommitDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 LastCommitDate = new DateTime(2024, 1, 7, 0, 0, 0, DateTimeKind.Utc),
                 AgeDays = 7,

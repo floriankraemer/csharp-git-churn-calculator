@@ -7,6 +7,7 @@ The CLI reports several git-derived metrics plus a **Churn Risk Score**. Only tr
 ## Inputs from git
 
 - **TotalCommits** — how many times the file appears across `git log` (each commit that lists the file counts once).
+- **LinesAdded** / **LinesRemoved** — cumulative line insertions and deletions summed from `git log --numstat` over the **same history window** as **TotalCommits** (full history, or commits on or before `AsOf` in time-series mode). Binary file rows (`-`/`-`) contribute zero to both totals. Paths are gathered with `core.quotepath=false` so keys match tracked paths.
 - **FirstCommitDate** / **LastCommitDate** — timestamps from the log for that file’s first and latest appearance.
 - **TotalUniqueAuthors** — count of distinct author emails that touched the file over all time (other author columns use the same idea over rolling windows).
 
@@ -62,7 +63,7 @@ When `--series week` or `--series month` is used together with `--from` (and opt
 
 Each analysis point receives an **`AsOf`** date (the bucket end). The tool passes this date as `--until` to every `git log` query, so history is bounded: commits after `AsOf` are invisible to that point's analysis. This means:
 
-- **`TotalCommits`**, **`FirstCommitDate`**, **`LastCommitDate`**, and **`TotalUniqueAuthors`** only count commits on or before `AsOf`.
+- **`TotalCommits`**, **`LinesAdded`**, **`LinesRemoved`**, **`FirstCommitDate`**, **`LastCommitDate`**, and **`TotalUniqueAuthors`** only reflect history on or before `AsOf`.
 - Rolling windows (`CommitsLast7Days`, `UniqueAuthorsLast30Days`, etc.) are calculated relative to `AsOf`, not the wall-clock time the tool is run.
 - **`AgeDays`** is the span from a file's first commit (as of that date) to `AsOf`.
 
@@ -76,7 +77,7 @@ Each analysis point receives an **`AsOf`** date (the bucket end). The tool passe
 
 ### Performance
 
-The tool executes **one full set of git queries per time point**. For a weekly series covering one year that is approximately 52 × 10 = 520 `git log` invocations. On large repositories or long date ranges this can take several minutes.
+The tool executes **one full set of git queries per time point**. For a weekly series covering one year that is approximately 52 × 11 = 572 `git log` invocations (including one `--numstat` pass per bucket for line totals). On large repositories or long date ranges this can take several minutes.
 
 ## Cobertura coverage mapping
 

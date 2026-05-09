@@ -88,6 +88,7 @@ Targets:
   publish-single   self-contained single-file publish -> artifacts\publish-<RID>
   pack-tool        dotnet tool package -> artifacts\nupkg
   coverage         run tests with Coverlet + HTML report -> artifacts/coverage
+  mutation-test    Stryker.NET on critical paths (HTML under each project's StrykerOutput/)
   help             show this message
 "@
 }
@@ -204,6 +205,30 @@ switch ($Target.ToLowerInvariant()) {
         Write-Host "Coverage complete." -ForegroundColor Green
         Write-Host "  Cobertura: $coberturaPath"
         Write-Host "  HTML:      $indexHtml"
+    }
+    "mutation-test" {
+        Push-Location $PSScriptRoot
+        try {
+            Invoke-DotNet @("tool", "restore")
+            $hasGlobalStryker = $null -ne (Get-Command dotnet-stryker -ErrorAction SilentlyContinue)
+            Push-Location (Join-Path $PSScriptRoot "GitChurnCalculator")
+            try {
+                if ($hasGlobalStryker) { & dotnet-stryker } else { Invoke-DotNet @("tool", "run", "dotnet-stryker") }
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+            finally { Pop-Location }
+            Push-Location (Join-Path $PSScriptRoot "GitChurnCalculator.Console")
+            try {
+                if ($hasGlobalStryker) { & dotnet-stryker } else { Invoke-DotNet @("tool", "run", "dotnet-stryker") }
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+            finally { Pop-Location }
+        }
+        finally { Pop-Location }
+        Write-Host ""
+        Write-Host "Mutation testing complete." -ForegroundColor Green
+        Write-Host "  Library HTML: GitChurnCalculator/StrykerOutput/<run>/reports/mutation-report.html"
+        Write-Host "  Console HTML: GitChurnCalculator.Console/StrykerOutput/<run>/reports/mutation-report.html"
     }
     default {
         Write-Host "Unknown target: $Target" -ForegroundColor Red

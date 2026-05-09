@@ -1,0 +1,15 @@
+{
+  "stryker-config": {
+    "project": "GitChurnCalculator.csproj",
+    "test-projects": [ "../GitChurnCalculator.Tests/GitChurnCalculator.Tests.csproj" ],
+    "mutation-level": "Standard",
+    "reporters": [ "progress", "html" ],
+    "mutate": [
+      "Services/ChurnCalculator.cs",
+      "Services/GitProcessDataProvider.cs",
+      "Services/CoveragePathMatcher.cs",
+      "Services/CoberturaXmlParser.cs",
+      "Services/AutoDetectCoverageParser.cs"
+    ]
+  }
+}

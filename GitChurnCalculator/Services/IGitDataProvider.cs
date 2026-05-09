@@ -68,4 +68,14 @@ public interface IGitDataProvider
     /// Returns per-file unique author count for commits in the half-open interval (since, until].
     /// </summary>
     Task<Dictionary<string, int>> GetUniqueAuthorCountsSinceUntilAsync(string repoPath, DateTime since, DateTime until, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file cumulative insertions/deletions (<c>--numstat</c>) across full history.
+    /// </summary>
+    Task<Dictionary<string, LineChangeTotals>> GetLineChangeTotalsAsync(string repoPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns per-file cumulative insertions/deletions (<c>--numstat</c>) for commits on or before <paramref name="until"/>.
+    /// </summary>
+    Task<Dictionary<string, LineChangeTotals>> GetLineChangeTotalsUntilAsync(string repoPath, DateTime until, CancellationToken ct = default);
 }

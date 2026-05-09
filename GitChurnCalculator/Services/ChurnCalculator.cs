@@ -41,6 +41,7 @@ public sealed class ChurnCalculator : IChurnCalculator
         Task<Dictionary<string, int>> authors7Task;
         Task<Dictionary<string, int>> authors30Task;
         Task<Dictionary<string, int>> authors365Task;
+        Task<Dictionary<string, LineChangeTotals>> lineTotalsTask;
 
         if (options.AsOf.HasValue)
         {
@@ -54,6 +55,7 @@ public sealed class ChurnCalculator : IChurnCalculator
             authors7Task = _gitDataProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, sevenDaysAgo, now, ct);
             authors30Task = _gitDataProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, thirtyDaysAgo, now, ct);
             authors365Task = _gitDataProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, yearAgo, now, ct);
+            lineTotalsTask = _gitDataProvider.GetLineChangeTotalsUntilAsync(repoPath, now, ct);
         }
         else
         {
@@ -67,12 +69,14 @@ public sealed class ChurnCalculator : IChurnCalculator
             authors7Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, sevenDaysAgo, ct);
             authors30Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, thirtyDaysAgo, ct);
             authors365Task = _gitDataProvider.GetUniqueAuthorCountsSinceAsync(repoPath, yearAgo, ct);
+            lineTotalsTask = _gitDataProvider.GetLineChangeTotalsAsync(repoPath, ct);
         }
 
         await Task.WhenAll(
             commitCountsTask, firstDatesTask, lastDatesTask,
             commits7Task, commits30Task, commits365Task,
-            authorsAllTask, authors7Task, authors30Task, authors365Task);
+            authorsAllTask, authors7Task, authors30Task, authors365Task,
+            lineTotalsTask);
 
         var commitCounts = commitCountsTask.Result;
         var firstDates = firstDatesTask.Result;
@@ -84,6 +88,7 @@ public sealed class ChurnCalculator : IChurnCalculator
         var authors7 = authors7Task.Result;
         var authors30 = authors30Task.Result;
         var authors365 = authors365Task.Result;
+        var lineTotals = lineTotalsTask.Result;
 
         // Parse coverage if provided
         Dictionary<string, double>? coverageMap = null;
@@ -125,10 +130,13 @@ public sealed class ChurnCalculator : IChurnCalculator
             var churnRiskScore = CalculateChurnRiskScore(
                 changesPerWeek, totalUniqueAuthors, coveragePercent);
 
+            var lines = lineTotals.GetValueOrDefault(file);
             results.Add(new FileChurnResult
             {
                 FilePath = file,
                 TotalCommits = totalCommits,
+                LinesAdded = lines.Added,
+                LinesRemoved = lines.Removed,
                 FirstCommitDate = firstDate != default ? firstDate : null,
                 LastCommitDate = lastDate != default ? lastDate : null,
                 AgeDays = ageDays,

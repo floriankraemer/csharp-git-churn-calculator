@@ -21,6 +21,11 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
     && /tmp/dotnet-install.sh --channel 8.0 --runtime dotnet --install-dir /usr/share/dotnet \
     && rm /tmp/dotnet-install.sh
 
+# Stryker.NET — see docs/build.md; `make mutation-test` uses `dotnet-stryker`.
+RUN dotnet tool install -g dotnet-stryker --version 4.14.1
+
+ENV PATH="${PATH}:/root/.dotnet/tools"
+
 WORKDIR /src
 
 CMD ["make", "help"]

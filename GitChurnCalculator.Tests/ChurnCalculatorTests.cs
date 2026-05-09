@@ -7,6 +7,8 @@ namespace GitChurnCalculator.Tests;
 
 public class ChurnCalculatorTests
 {
+    private static readonly Dictionary<string, LineChangeTotals> EmptyLineTotals = new(StringComparer.Ordinal);
+
     [Fact]
     public void CalculateChurnRiskScore_WithoutCoverage_ReturnsChangesTimesAuthors()
     {
@@ -74,6 +76,18 @@ public class ChurnCalculatorTests
     }
 
     [Fact]
+    public void CalculateChurnRiskScore_NearFullCoverage_AppliesSmallMultiplier()
+    {
+        var score = ChurnCalculator.CalculateChurnRiskScore(
+            changesPerWeek: 10.0,
+            totalUniqueAuthors: 5,
+            coveragePercent: 99.995);
+
+        var expected = 10.0 * 5 * (1 - 99.995 / 100.0);
+        Assert.Equal(Math.Round(expected, 4), score);
+    }
+
+    [Fact]
     public void CalculateChurnRiskScore_GrokExample_CorrectResult()
     {
         // From the Grok conversation: ChangesPerWeek=12.45, Authors=8, Coverage=35%
@@ -123,6 +137,14 @@ public class ChurnCalculatorTests
         };
         gitProvider.GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(authors);
 
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, LineChangeTotals>(StringComparer.Ordinal)
+            {
+                ["low.cs"] = new LineChangeTotals(2, 2),
+                ["high.cs"] = new LineChangeTotals(200, 150),
+                ["mid.cs"] = new LineChangeTotals(20, 10),
+            });
+
         var empty = new Dictionary<string, int>();
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
@@ -132,6 +154,8 @@ public class ChurnCalculatorTests
 
         Assert.Equal(3, results.Count);
         Assert.Equal("high.cs", results[0].FilePath);
+        Assert.Equal(200, results[0].LinesAdded);
+        Assert.Equal(150, results[0].LinesRemoved);
         Assert.Equal("mid.cs", results[1].FilePath);
         Assert.Equal("low.cs", results[2].FilePath);
 
@@ -174,6 +198,8 @@ public class ChurnCalculatorTests
             ["src/Generated.cs"] = 1,
         };
         gitProvider.GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(authors);
+
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
 
         var empty = new Dictionary<string, int>();
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
@@ -223,6 +249,8 @@ public class ChurnCalculatorTests
             ["uncovered.cs"] = 5,
         };
         gitProvider.GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(authors);
+
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
 
         var empty = new Dictionary<string, int>();
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
@@ -275,6 +303,8 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
 
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
+
         var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
 
@@ -310,6 +340,9 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
 
+        gitProvider.GetLineChangeTotalsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, LineChangeTotals>(StringComparer.Ordinal) { ["file.cs"] = new LineChangeTotals(42, 7) });
+
         var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions
         {
@@ -318,18 +351,22 @@ public class ChurnCalculatorTests
         });
 
         Assert.Single(results);
+        Assert.Equal(42, results[0].LinesAdded);
+        Assert.Equal(7, results[0].LinesRemoved);
 
         // Verify unbounded methods were NOT called
         await gitProvider.DidNotReceive().GetCommitCountsAsync(repoPath, Arg.Any<CancellationToken>());
         await gitProvider.DidNotReceive().GetFirstCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
         await gitProvider.DidNotReceive().GetLastCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
         await gitProvider.DidNotReceive().GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>());
 
         // Verify bounded methods WERE called
         await gitProvider.Received(1).GetCommitCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
         await gitProvider.Received(1).GetFirstCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
         await gitProvider.Received(1).GetLastCommitDatesUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
         await gitProvider.Received(1).GetUniqueAuthorCountsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetLineChangeTotalsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -356,6 +393,8 @@ public class ChurnCalculatorTests
         var empty = new Dictionary<string, int>();
         gitProvider.GetCommitCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceUntilAsync(repoPath, Arg.Any<DateTime>(), asOf, Arg.Any<CancellationToken>()).Returns(empty);
+
+        gitProvider.GetLineChangeTotalsUntilAsync(repoPath, asOf, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
 
         var calculator = new ChurnCalculator(gitProvider, coverageParser);
         await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath, AsOf = asOf });
@@ -392,6 +431,8 @@ public class ChurnCalculatorTests
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
 
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
+
         var calculator = new ChurnCalculator(gitProvider, coverageParser);
         await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
 
@@ -400,12 +441,14 @@ public class ChurnCalculatorTests
         await gitProvider.Received(1).GetFirstCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
         await gitProvider.Received(1).GetLastCommitDatesAsync(repoPath, Arg.Any<CancellationToken>());
         await gitProvider.Received(1).GetUniqueAuthorCountsAsync(repoPath, Arg.Any<CancellationToken>());
+        await gitProvider.Received(1).GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>());
 
         // Bounded Until methods were NOT called
         await gitProvider.DidNotReceive().GetCommitCountsUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await gitProvider.DidNotReceive().GetFirstCommitDatesUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await gitProvider.DidNotReceive().GetLastCommitDatesUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await gitProvider.DidNotReceive().GetUniqueAuthorCountsUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await gitProvider.DidNotReceive().GetLineChangeTotalsUntilAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -431,6 +474,8 @@ public class ChurnCalculatorTests
         var empty = new Dictionary<string, int>();
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
+
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
 
         var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
@@ -463,6 +508,8 @@ public class ChurnCalculatorTests
         var empty = new Dictionary<string, int>();
         gitProvider.GetCommitCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
         gitProvider.GetUniqueAuthorCountsSinceAsync(repoPath, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(empty);
+
+        gitProvider.GetLineChangeTotalsAsync(repoPath, Arg.Any<CancellationToken>()).Returns(EmptyLineTotals);
 
         var calculator = new ChurnCalculator(gitProvider, coverageParser);
         var results = await calculator.AnalyzeAsync(new ChurnAnalysisOptions { RepositoryPath = repoPath });
