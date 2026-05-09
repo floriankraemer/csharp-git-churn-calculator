@@ -15,5 +15,5 @@ public static class TimeSeriesReportGeneratorFactory
         string.Join(", ", Generators.Keys);
 
     public static bool TryGet(string format, out ITimeSeriesReportGenerator? generator) =>
-        Generators.TryGetValue(format, out generator);
+        Generators.TryGetValue(format.Trim(), out generator);
 }

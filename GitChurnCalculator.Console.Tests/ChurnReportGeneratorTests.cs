@@ -89,6 +89,86 @@ public class ChurnReportGeneratorTests
         Assert.Contains("::", text);
     }
 
+    [Theory]
+    [InlineData(0.0, "notice")]
+    [InlineData(0.999, "notice")]
+    [InlineData(1.0, "warning")]
+    [InlineData(5.0, "warning")]
+    [InlineData(9.999, "warning")]
+    [InlineData(10.0, "error")]
+    [InlineData(100.0, "error")]
+    public void GithubActionsChurn_CommandKind_UsesScoreBands(double score, string kind)
+    {
+        var gen = new GithubActionsChurnReportGenerator();
+        var text = gen.Generate(new[] { SampleFile("src/B.cs", score) }, "r").TrimStart();
+        Assert.StartsWith($"::{kind} file=", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GithubActionsChurn_BuildMessage_ContainsCoverageNaWhenAbsent()
+    {
+        var gen = new GithubActionsChurnReportGenerator();
+        var text = gen.Generate(new[] { SampleFile("src/B.cs", 1.0) }, "r");
+        Assert.Contains("coverage=n/a", text, StringComparison.Ordinal);
+        Assert.Contains("+0/-0", text, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0.0, "note")]
+    [InlineData(0.999, "note")]
+    [InlineData(1.0, "warning")]
+    [InlineData(9.999, "warning")]
+    [InlineData(10.0, "error")]
+    public void SarifChurn_Level_UsesScoreBands(double score, string expectedLevel)
+    {
+        var gen = new SarifChurnReportGenerator();
+        var json = gen.Generate(new[] { SampleFile("band.cs", score) }, "r");
+        using var doc = JsonDocument.Parse(json);
+        var level = doc.RootElement.GetProperty("runs")[0].GetProperty("results")[0].GetProperty("level").GetString();
+        Assert.Equal(expectedLevel, level);
+    }
+
+    [Theory]
+    [InlineData(0.5, "info")]
+    [InlineData(1.0, "minor")]
+    [InlineData(10.0, "major")]
+    public void GitlabChurn_Severity_UsesScoreBands(double score, string expectedSeverity)
+    {
+        var gen = new GitlabCodeQualityChurnReportGenerator();
+        var json = gen.Generate(new[] { SampleFile("gl.cs", score) }, "r");
+        using var doc = JsonDocument.Parse(json);
+        var sev = doc.RootElement[0].GetProperty("severity").GetString();
+        Assert.Equal(expectedSeverity, sev);
+    }
+
+    [Fact]
+    public void GithubActionsChurn_NormalizesBackslashesInWorkflowFileParameter()
+    {
+        var row = SampleFile(@"src\Dept\File.cs", 5.0);
+        var gen = new GithubActionsChurnReportGenerator();
+        var text = gen.Generate(new[] { row }, "r");
+
+        Assert.Contains("file=src/Dept/File.cs", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SarifChurn_NormalizesBackslashInArtifactUri()
+    {
+        var gen = new SarifChurnReportGenerator();
+        var json = gen.Generate(new[] { SampleFile(@"x\y\Z.cs", 0.5) }, "repo");
+        Assert.Contains(@"""uri"": ""x/y/Z.cs""", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JsonChurnReportGenerator_EmptyResults_IsEmptyArray()
+    {
+        var gen = new JsonChurnReportGenerator();
+        var json = gen.Generate(Array.Empty<FileChurnResult>(), "sub");
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Equal(0, doc.RootElement.GetArrayLength());
+    }
+
     [Fact]
     public void GitlabCodeQualityChurn_IsJsonArrayWithFingerprint()
     {

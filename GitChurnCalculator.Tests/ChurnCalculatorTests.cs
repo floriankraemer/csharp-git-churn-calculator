@@ -76,6 +76,18 @@ public class ChurnCalculatorTests
     }
 
     [Fact]
+    public void CalculateChurnRiskScore_NearFullCoverage_AppliesSmallMultiplier()
+    {
+        var score = ChurnCalculator.CalculateChurnRiskScore(
+            changesPerWeek: 10.0,
+            totalUniqueAuthors: 5,
+            coveragePercent: 99.995);
+
+        var expected = 10.0 * 5 * (1 - 99.995 / 100.0);
+        Assert.Equal(Math.Round(expected, 4), score);
+    }
+
+    [Fact]
     public void CalculateChurnRiskScore_GrokExample_CorrectResult()
     {
         // From the Grok conversation: ChangesPerWeek=12.45, Authors=8, Coverage=35%

@@ -54,7 +54,7 @@ _CONTAINER_RUN = $(CONTAINER_RUNNER) run --rm dev make $@ RID="$(RID)" IN_CONTAI
 
 .DEFAULT_GOAL := help
 
-.PHONY: help restore build-debug build build-release test test-debug test-release clean ci publish-single pack-tool coverage
+.PHONY: help restore build-debug build build-release test test-debug test-release clean ci publish-single pack-tool coverage mutation-test
 
 help:
 	@echo "Git Churn Calculator — Makefile (same targets as make.ps1)"
@@ -80,6 +80,7 @@ help:
 	@echo "  publish-single   self-contained single-file publish -> artifacts/publish-<RID>"
 	@echo "  pack-tool        dotnet tool package -> artifacts/nupkg"
 	@echo "  coverage         run tests with Coverlet + HTML report -> artifacts/coverage"
+	@echo "  mutation-test    dotnet tool restore + Stryker on critical libs (HTML under .../StrykerOutput/)"
 	@echo "  help             show this message"
 
 ifeq ($(_NATIVE),1)
@@ -147,9 +148,18 @@ coverage:
 	@echo "  Cobertura: artifacts/coverage/coverage.cobertura.xml"
 	@echo "  HTML:      artifacts/coverage/html/index.html"
 
+mutation-test:
+	dotnet tool restore
+	cd GitChurnCalculator && (command -v dotnet-stryker >/dev/null 2>&1 && dotnet-stryker || dotnet tool run dotnet-stryker)
+	cd GitChurnCalculator.Console && (command -v dotnet-stryker >/dev/null 2>&1 && dotnet-stryker || dotnet tool run dotnet-stryker)
+	@echo ""
+	@echo "Mutation testing complete."
+	@echo "  Library HTML: GitChurnCalculator/StrykerOutput/<run>/reports/mutation-report.html"
+	@echo "  Console HTML: GitChurnCalculator.Console/StrykerOutput/<run>/reports/mutation-report.html"
+
 else
 
-restore build-debug build build-release test test-debug test-release clean ci publish-single pack-tool coverage:
+restore build-debug build build-release test test-debug test-release clean ci publish-single pack-tool coverage mutation-test:
 	$(_CONTAINER_RUN)
 
 endif

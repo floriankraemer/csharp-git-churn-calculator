@@ -170,10 +170,7 @@ public class GitDataProviderParsingTests
     [Fact]
     public void ParseLineChangeTotalsFromNumstatLog_NonThreeColumnLines_Ignores()
     {
-        var output = """
-                     malformed line
-                     1\t2	src/Ok.cs
-                     """;
+        const string output = "malformed line\n1\t2\tsrc/Ok.cs";
 
         var result = GitProcessDataProvider.ParseLineChangeTotalsFromNumstatLog(output);
 

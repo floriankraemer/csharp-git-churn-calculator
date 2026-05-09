@@ -6,33 +6,6 @@ namespace GitChurnCalculator.Console.Tests;
 
 public class ChurnAnalysisAppTests
 {
-    private static FileChurnResult OneRow()
-    {
-        var d = new DateTime(2024, 6, 15, 0, 0, 0, DateTimeKind.Utc);
-        return new FileChurnResult
-        {
-            FilePath = "src/Example.cs",
-            TotalCommits = 12,
-            LinesAdded = 0,
-            LinesRemoved = 0,
-            FirstCommitDate = d.AddDays(-20),
-            LastCommitDate = d,
-            AgeDays = 20,
-            ChangesPerWeek = 4.2,
-            ChangesPerMonth = 18.0,
-            ChangesPerYear = 219.0,
-            CommitsLast7Days = 2,
-            CommitsLast30Days = 8,
-            CommitsLast365Days = 12,
-            TotalUniqueAuthors = 3,
-            UniqueAuthorsLast7Days = 1,
-            UniqueAuthorsLast30Days = 2,
-            UniqueAuthorsLast365Days = 3,
-            CoveragePercent = 80.0,
-            ChurnRiskScore = 2.52,
-        };
-    }
-
     private static int SaveExitCode()
     {
         var c = Environment.ExitCode;
@@ -49,7 +22,7 @@ public class ChurnAnalysisAppTests
         try
         {
             var fake = new FakeChurnCalculator();
-            fake.Results.Add(OneRow());
+            fake.Results.Add(TestFixtures.OneRow());
             var app = new ChurnAnalysisApp(fake);
             using var repo = new TempRepoDir();
             var outFile = new FileInfo(Path.Combine(repo.Path, "out.csv"));
@@ -74,7 +47,7 @@ public class ChurnAnalysisAppTests
         try
         {
             var fake = new FakeChurnCalculator();
-            fake.Results.Add(OneRow());
+            fake.Results.Add(TestFixtures.OneRow());
             var app = new ChurnAnalysisApp(fake);
             using var repo = new TempRepoDir();
 
@@ -176,7 +149,7 @@ public class ChurnAnalysisAppTests
         try
         {
             var fake = new FakeChurnCalculator();
-            fake.Results.Add(OneRow());
+            fake.Results.Add(TestFixtures.OneRow());
             var app = new ChurnAnalysisApp(fake);
             using var repo = new TempRepoDir();
 
@@ -197,7 +170,7 @@ public class ChurnAnalysisAppTests
         try
         {
             var fake = new FakeChurnCalculator();
-            fake.Results.Add(OneRow());
+            fake.Results.Add(TestFixtures.OneRow());
             var app = new ChurnAnalysisApp(fake);
             using var repo = new TempRepoDir();
 
@@ -221,13 +194,73 @@ public class ChurnAnalysisAppTests
     }
 
     [Fact]
+    public async Task Snapshot_ValidRepo_WritesHtml()
+    {
+        var prev = SaveExitCode();
+        try
+        {
+            var fake = new FakeChurnCalculator();
+            fake.Results.Add(TestFixtures.OneRow());
+            var app = new ChurnAnalysisApp(fake);
+            using var repo = new TempRepoDir();
+            var outFile = new FileInfo(Path.Combine(repo.Path, "out.html"));
+
+            await app.HandleAsync(new DirectoryInfo(repo.Path), "html", null, outFile, null, null, null, null, null);
+
+            Assert.Equal(0, Environment.ExitCode);
+            Assert.True(outFile.Exists);
+            var text = await File.ReadAllTextAsync(outFile.FullName);
+            Assert.Contains("<!DOCTYPE html>", text, StringComparison.Ordinal);
+            Assert.Contains("Git churn risk report", text, StringComparison.Ordinal);
+        }
+        finally
+        {
+            RestoreExitCode(prev);
+        }
+    }
+
+    [Fact]
+    public async Task TimeSeries_ValidWeek_WritesHtmlDetails()
+    {
+        var prev = SaveExitCode();
+        try
+        {
+            var fake = new FakeChurnCalculator();
+            fake.Results.Add(TestFixtures.OneRow());
+            var app = new ChurnAnalysisApp(fake);
+            using var repo = new TempRepoDir();
+            var outFile = new FileInfo(Path.Combine(repo.Path, "ts.html"));
+
+            await app.HandleAsync(
+                new DirectoryInfo(repo.Path),
+                "html",
+                null,
+                outFile,
+                null,
+                null,
+                "week",
+                "2024-01-01",
+                "2024-01-14");
+
+            Assert.Equal(0, Environment.ExitCode);
+            Assert.True(outFile.Exists);
+            var text = await File.ReadAllTextAsync(outFile.FullName);
+            Assert.Contains("time series", text, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            RestoreExitCode(prev);
+        }
+    }
+
+    [Fact]
     public async Task TimeSeries_ValidWeek_WritesJson()
     {
         var prev = SaveExitCode();
         try
         {
             var fake = new FakeChurnCalculator();
-            fake.Results.Add(OneRow());
+            fake.Results.Add(TestFixtures.OneRow());
             var app = new ChurnAnalysisApp(fake);
             using var repo = new TempRepoDir();
             var outFile = new FileInfo(Path.Combine(repo.Path, "ts.json"));

@@ -1,0 +1,13 @@
+{
+  "stryker-config": {
+    "project": "GitChurnCalculator.Console.csproj",
+    "test-projects": [ "../GitChurnCalculator.Console.Tests/GitChurnCalculator.Console.Tests.csproj" ],
+    "mutation-level": "Standard",
+    "reporters": [ "progress", "html" ],
+    "mutate": [
+      "Reporting/ChurnCiSeverity.cs",
+      "Reporting/ChurnCiEncoding.cs",
+      "Reporting/ChurnReportGeneratorFactory.cs"
+    ]
+  }
+}
