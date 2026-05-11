@@ -42,49 +42,114 @@
                 Click="OpenRepository_Click" />
       </StackPanel>
 
-      <Grid IsVisible="{Binding HasRepository}"
-            ColumnDefinitions="320,*">
-        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                BorderThickness="0,0,1,0">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Top"
-                       Margin="12"
-                       Text="Analyzed Files"
-                       FontWeight="SemiBold" />
-            <TreeView ItemsSource="{Binding FileTree}"
-                      SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
-              <TreeView.ItemTemplate>
-                <TreeDataTemplate ItemsSource="{Binding Children}">
-                  <TextBlock Text="{Binding Name}" />
-                </TreeDataTemplate>
-              </TreeView.ItemTemplate>
-            </TreeView>
-          </DockPanel>
-        </Border>
+      <TabControl IsVisible="{Binding HasRepository}">
+        <TabItem Header="Tree View">
+          <Grid ColumnDefinitions="320,*">
+            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,1,0">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top"
+                           Margin="12"
+                           Text="Analyzed Files"
+                           FontWeight="SemiBold" />
+                <TreeView ItemsSource="{Binding FileTree}"
+                          SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+                  <TreeView.Styles>
+                    <Style Selector="TreeViewItem">
+                      <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    </Style>
+                  </TreeView.Styles>
+                  <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                      <TextBlock Text="{Binding Name}" />
+                    </TreeDataTemplate>
+                  </TreeView.ItemTemplate>
+                </TreeView>
+              </DockPanel>
+            </Border>
 
-        <DockPanel Grid.Column="1">
-          <StackPanel DockPanel.Dock="Top" Margin="16,12,16,8">
-            <TextBlock Text="File Details" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding StatusMessage}" Margin="0,4,0,0" />
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Margin="0,4,0,0"
-                       Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
-          </StackPanel>
+            <DockPanel Grid.Column="1">
+              <StackPanel DockPanel.Dock="Top" Margin="16,12,16,8">
+                <TextBlock Text="File Details" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding StatusMessage}" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Margin="0,4,0,0"
+                           Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+              </StackPanel>
 
-          <DataGrid Margin="16,0,16,16"
-                    ItemsSource="{Binding SelectedFileMetrics}"
-                    AutoGenerateColumns="False"
-                    IsReadOnly="True"
-                    CanUserResizeColumns="True"
-                    CanUserSortColumns="False"
-                    GridLinesVisibility="All">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Metric" Binding="{Binding Name}" Width="2*" />
-              <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="3*" />
-            </DataGrid.Columns>
-          </DataGrid>
-        </DockPanel>
-      </Grid>
+              <DataGrid Margin="16,0,16,16"
+                        ItemsSource="{Binding SelectedFileMetrics}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="True"
+                        CanUserResizeColumns="True"
+                        CanUserSortColumns="False"
+                        GridLinesVisibility="All">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Metric" Binding="{Binding Name}" Width="2*" />
+                  <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="3*" />
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </Grid>
+        </TabItem>
+
+        <TabItem Header="List View">
+          <Grid ColumnDefinitions="320,*">
+            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,1,0">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top"
+                           Margin="12"
+                           Text="Analyzed Files"
+                           FontWeight="SemiBold" />
+                <TreeView ItemsSource="{Binding FileTree}"
+                          SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+                  <TreeView.Styles>
+                    <Style Selector="TreeViewItem">
+                      <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    </Style>
+                  </TreeView.Styles>
+                  <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                      <TextBlock Text="{Binding Name}" />
+                    </TreeDataTemplate>
+                  </TreeView.ItemTemplate>
+                </TreeView>
+              </DockPanel>
+            </Border>
+
+            <DockPanel Grid.Column="1">
+              <StackPanel DockPanel.Dock="Top" Margin="16,12,16,8" Spacing="8">
+                <TextBlock Text="Files By Churn Score" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding StatusMessage}" />
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+                <TextBox Text="{Binding FileNameFilter, UpdateSourceTrigger=PropertyChanged}"
+                         Watermark="Filter by file name" />
+              </StackPanel>
+
+              <DataGrid Margin="16,0,16,16"
+                        ItemsSource="{Binding FileList}"
+                        SelectedItem="{Binding SelectedFile, Mode=TwoWay}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="True"
+                        CanUserResizeColumns="True"
+                        CanUserSortColumns="True"
+                        GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="3*" />
+                  <DataGridTextColumn Header="Churn Score" Binding="{Binding ChurnRiskScore}" Width="*" />
+                  <DataGridTextColumn Header="Commits" Binding="{Binding TotalCommits}" Width="*" />
+                  <DataGridTextColumn Header="Authors" Binding="{Binding TotalUniqueAuthors}" Width="*" />
+                  <DataGridTextColumn Header="Lines Added" Binding="{Binding LinesAdded}" Width="*" />
+                  <DataGridTextColumn Header="Lines Removed" Binding="{Binding LinesRemoved}" Width="*" />
+                  <DataGridTextColumn Header="Coverage" Binding="{Binding CoveragePercent}" Width="*" />
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </Grid>
+        </TabItem>
+      </TabControl>
     </Grid>
   </DockPanel>
 </Window>

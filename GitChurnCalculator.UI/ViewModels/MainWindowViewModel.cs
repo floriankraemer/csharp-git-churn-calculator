@@ -11,13 +11,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly RepositoryAnalyzer _repositoryAnalyzer;
     private readonly SettingsStore _settingsStore;
     private AppSettings _settings = new();
+    private IReadOnlyList<FileChurnResult> _analysisResults = [];
     private ObservableCollection<FileTreeNode> _fileTree = [];
+    private ObservableCollection<FileChurnResult> _fileList = [];
     private ObservableCollection<FileMetric> _selectedFileMetrics = [];
     private FileTreeNode? _selectedNode;
+    private FileChurnResult? _selectedFile;
+    private string? _fileNameFilter;
     private string? _repositoryPath;
     private string? _statusMessage = "Open a repository to analyze churn.";
     private string? _errorMessage;
     private bool _isAnalyzing;
+    private bool _isSynchronizingSelection;
 
     public MainWindowViewModel(RepositoryAnalyzer repositoryAnalyzer, SettingsStore settingsStore)
     {
@@ -29,6 +34,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _fileTree;
         private set => SetProperty(ref _fileTree, value);
+    }
+
+    public ObservableCollection<FileChurnResult> FileList
+    {
+        get => _fileList;
+        private set => SetProperty(ref _fileList, value);
     }
 
     public ObservableCollection<FileMetric> SelectedFileMetrics
@@ -45,9 +56,37 @@ public sealed class MainWindowViewModel : ViewModelBase
             if (!SetProperty(ref _selectedNode, value))
                 return;
 
-            SelectedFileMetrics = value?.Result is null
-                ? []
-                : BuildMetrics(value.Result);
+            if (_isSynchronizingSelection)
+                return;
+
+            if (value?.Result is { } result)
+                SelectFile(result);
+            else
+                ClearSelectedFile();
+        }
+    }
+
+    public FileChurnResult? SelectedFile
+    {
+        get => _selectedFile;
+        set
+        {
+            if (!SetProperty(ref _selectedFile, value))
+                return;
+
+            SelectedFileMetrics = value is null ? [] : BuildMetrics(value);
+            if (!_isSynchronizingSelection && value is not null)
+                SelectNodeForFile(value.FilePath);
+        }
+    }
+
+    public string? FileNameFilter
+    {
+        get => _fileNameFilter;
+        set
+        {
+            if (SetProperty(ref _fileNameFilter, value))
+                ApplyFileFilter();
         }
     }
 
@@ -142,11 +181,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             IsAnalyzing = true;
             ErrorMessage = null;
             StatusMessage = "Analyzing repository...";
-            SelectedNode = null;
-            SelectedFileMetrics = [];
+            ClearSelection();
 
             var results = await _repositoryAnalyzer.AnalyzeAsync(_settings);
+            _analysisResults = results;
             FileTree = FileTreeNode.Build(results);
+            ApplyFileFilter();
             StatusMessage = $"Found {results.Count} files with commit history.";
             await _settingsStore.SaveAsync(_settings);
         }
@@ -163,11 +203,90 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void ClearAnalysis(string statusMessage)
     {
+        _analysisResults = [];
         FileTree = [];
-        SelectedNode = null;
-        SelectedFileMetrics = [];
+        FileList = [];
+        ClearSelection();
         StatusMessage = statusMessage;
         ErrorMessage = null;
+    }
+
+    private void ApplyFileFilter()
+    {
+        var filteredResults = FilterResults(_analysisResults);
+        FileList = new ObservableCollection<FileChurnResult>(
+            filteredResults
+                .OrderByDescending(x => x.ChurnRiskScore)
+                .ThenBy(x => x.FilePath, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private IReadOnlyList<FileChurnResult> FilterResults(IReadOnlyList<FileChurnResult> results)
+    {
+        if (string.IsNullOrWhiteSpace(FileNameFilter))
+            return results;
+
+        return results
+            .Where(x => Path.GetFileName(x.FilePath).Contains(FileNameFilter.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private void SelectFile(FileChurnResult result)
+    {
+        SelectedFile = result;
+    }
+
+    private void SelectNodeForFile(string filePath)
+    {
+        var node = FindNodeByPath(FileTree, filePath);
+        if (node is null)
+            return;
+
+        ExpandAncestors(node);
+
+        try
+        {
+            _isSynchronizingSelection = true;
+            SelectedNode = node;
+        }
+        finally
+        {
+            _isSynchronizingSelection = false;
+        }
+    }
+
+    private static FileTreeNode? FindNodeByPath(IEnumerable<FileTreeNode> nodes, string filePath)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Result is not null && string.Equals(node.Result.FilePath, filePath, StringComparison.Ordinal))
+                return node;
+
+            var child = FindNodeByPath(node.Children, filePath);
+            if (child is not null)
+                return child;
+        }
+
+        return null;
+    }
+
+    private static void ExpandAncestors(FileTreeNode node)
+    {
+        for (var parent = node.Parent; parent is not null; parent = parent.Parent)
+        {
+            parent.IsExpanded = true;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        SelectedNode = null;
+        ClearSelectedFile();
+    }
+
+    private void ClearSelectedFile()
+    {
+        SelectedFile = null;
+        SelectedFileMetrics = [];
     }
 
     private static ObservableCollection<FileMetric> BuildMetrics(FileChurnResult result) =>
@@ -175,6 +294,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         new("File path", result.FilePath),
         new("Churn risk score", result.ChurnRiskScore.ToString("0.####", CultureInfo.InvariantCulture)),
         new("Total commits", result.TotalCommits.ToString(CultureInfo.InvariantCulture)),
+        new("Lines added", result.LinesAdded.ToString(CultureInfo.InvariantCulture)),
+        new("Lines removed", result.LinesRemoved.ToString(CultureInfo.InvariantCulture)),
         new("First commit", FormatDate(result.FirstCommitDate)),
         new("Last commit", FormatDate(result.LastCommitDate)),
         new("Age days", result.AgeDays.ToString(CultureInfo.InvariantCulture)),
