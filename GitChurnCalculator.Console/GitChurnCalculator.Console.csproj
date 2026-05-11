@@ -36,6 +36,10 @@
     <ProjectReference Include="..\GitChurnCalculator\GitChurnCalculator.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="GitChurnCalculator.Console.Tests" />
+  </ItemGroup>
+
   <!-- Keep AssemblyName = project file name so the class library and console app do not both emit GitChurnCalculator.dll; rename only the published apphost. -->
   <Target Name="RenamePublishedExecutable" AfterTargets="Publish">
     <PropertyGroup>

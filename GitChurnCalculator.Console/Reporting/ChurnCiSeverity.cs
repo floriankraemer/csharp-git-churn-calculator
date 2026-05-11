@@ -1,3 +1,4 @@
+using System.Globalization;
 using GitChurnCalculator.Models;
 
 namespace GitChurnCalculator.Console.Reporting;
@@ -34,5 +35,6 @@ internal static class ChurnCiSeverity
         return $"Churn risk score {r.ChurnRiskScore:F4} (commits={r.TotalCommits}, +{r.LinesAdded}/-{r.LinesRemoved}, authors={r.TotalUniqueAuthors}, coverage={FormatCoverage(r.CoveragePercent)})";
     }
 
-    private static string FormatCoverage(double? p) => p.HasValue ? $"{p.Value:F1}%" : "n/a";
+    private static string FormatCoverage(double? p) =>
+        p.HasValue ? string.Concat(p.Value.ToString("F1", CultureInfo.InvariantCulture), "%") : "n/a";
 }
