@@ -29,4 +29,35 @@ public sealed class RepositoryAnalyzer
 
         return _calculator.AnalyzeAsync(options, ct);
     }
+
+    public async Task<IReadOnlyList<TimeSeriesPoint>> AnalyzeTimeSeriesAsync(
+        AppSettings settings,
+        DateTime from,
+        DateTime to,
+        CancellationToken ct = default)
+    {
+        if (from > to)
+            throw new InvalidOperationException("Start date must be on or before end date.");
+
+        var bucketEnds = TimeSeriesBucketEndCalculator.BuildMonthEnds(from, to);
+        var points = new List<TimeSeriesPoint>(bucketEnds.Count);
+
+        foreach (var asOf in bucketEnds)
+        {
+            ct.ThrowIfCancellationRequested();
+            var snapshotSettings = new AppSettings
+            {
+                LastRepositoryPath = settings.LastRepositoryPath,
+                CoverageFilePath = settings.CoverageFilePath,
+                IncludePattern = settings.IncludePattern,
+                ExcludePattern = settings.ExcludePattern,
+                AsOf = asOf,
+            };
+
+            var files = await AnalyzeAsync(snapshotSettings, ct);
+            points.Add(new TimeSeriesPoint { AsOf = asOf, Files = files });
+        }
+
+        return points;
+    }
 }

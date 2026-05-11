@@ -1,5 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:GitChurnCalculator.UI.Controls"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
         x:Class="GitChurnCalculator.UI.Views.MainWindow"
         Title="Git Churn Calculator"
         Width="1100"
@@ -148,6 +150,74 @@
               </DataGrid>
             </DockPanel>
           </Grid>
+        </TabItem>
+
+        <TabItem Header="Time series">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top"
+                        Margin="16,12,16,8"
+                        Orientation="Horizontal"
+                        Spacing="12">
+              <TextBlock Text="Start"
+                         VerticalAlignment="Center" />
+              <DatePicker SelectedDate="{Binding TimeSeriesStartDate}" />
+              <TextBlock Text="End"
+                         VerticalAlignment="Center" />
+              <DatePicker SelectedDate="{Binding TimeSeriesEndDate}" />
+              <Button Content="Run"
+                      Click="RunTimeSeries_Click" />
+              <ProgressBar Width="140"
+                           IsIndeterminate="True"
+                           IsVisible="{Binding IsAnalyzingTimeSeries}" />
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Top"
+                        Margin="16,0,16,8">
+              <TextBlock Text="{Binding TimeSeriesStatusMessage}" />
+            </StackPanel>
+
+            <Border Margin="16,0,16,16"
+                    Padding="12"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="1">
+              <ScottPlot:AvaPlot Name="TimeSeriesPlot"
+                                  MinHeight="500" />
+            </Border>
+          </DockPanel>
+        </TabItem>
+
+        <TabItem Header="Time Series 2">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top"
+                        Margin="16,12,16,8"
+                        Orientation="Horizontal"
+                        Spacing="12">
+              <TextBlock Text="Start"
+                         VerticalAlignment="Center" />
+              <DatePicker SelectedDate="{Binding TimeSeriesStartDate}" />
+              <TextBlock Text="End"
+                         VerticalAlignment="Center" />
+              <DatePicker SelectedDate="{Binding TimeSeriesEndDate}" />
+              <Button Content="Run"
+                      Click="RunTimeSeries_Click" />
+              <ProgressBar Width="140"
+                           IsIndeterminate="True"
+                           IsVisible="{Binding IsAnalyzingTimeSeries}" />
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Top"
+                        Margin="16,0,16,8">
+              <TextBlock Text="{Binding TimeSeriesStatusMessage}" />
+            </StackPanel>
+
+            <Border Margin="16,0,16,16"
+                    Padding="12"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="1">
+              <controls:TimeSeriesChart Series="{Binding TimeSeries}"
+                                        MinHeight="500" />
+            </Border>
+          </DockPanel>
         </TabItem>
       </TabControl>
     </Grid>

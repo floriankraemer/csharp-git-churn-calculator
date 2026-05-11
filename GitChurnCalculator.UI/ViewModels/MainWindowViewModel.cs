@@ -8,6 +8,8 @@ namespace GitChurnCalculator.UI.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
+    private const int TopTimeSeriesFileLimit = 50;
+
     private readonly RepositoryAnalyzer _repositoryAnalyzer;
     private readonly SettingsStore _settingsStore;
     private AppSettings _settings = new();
@@ -15,13 +17,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     private ObservableCollection<FileTreeNode> _fileTree = [];
     private ObservableCollection<FileChurnResult> _fileList = [];
     private ObservableCollection<FileMetric> _selectedFileMetrics = [];
+    private ObservableCollection<TimeSeriesGraphSeries> _timeSeries = [];
     private FileTreeNode? _selectedNode;
     private FileChurnResult? _selectedFile;
     private string? _fileNameFilter;
+    private DateTimeOffset? _timeSeriesStartDate = DateTimeOffset.UtcNow.AddMonths(-6);
+    private DateTimeOffset? _timeSeriesEndDate = DateTimeOffset.UtcNow;
+    private string? _timeSeriesStatusMessage = "Choose a start and end date, then run the time series analysis.";
     private string? _repositoryPath;
     private string? _statusMessage = "Open a repository to analyze churn.";
     private string? _errorMessage;
     private bool _isAnalyzing;
+    private bool _isAnalyzingTimeSeries;
     private bool _isSynchronizingSelection;
 
     public MainWindowViewModel(RepositoryAnalyzer repositoryAnalyzer, SettingsStore settingsStore)
@@ -46,6 +53,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _selectedFileMetrics;
         private set => SetProperty(ref _selectedFileMetrics, value);
+    }
+
+    public ObservableCollection<TimeSeriesGraphSeries> TimeSeries
+    {
+        get => _timeSeries;
+        private set => SetProperty(ref _timeSeries, value);
     }
 
     public FileTreeNode? SelectedNode
@@ -90,6 +103,24 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public DateTimeOffset? TimeSeriesStartDate
+    {
+        get => _timeSeriesStartDate;
+        set => SetProperty(ref _timeSeriesStartDate, value);
+    }
+
+    public DateTimeOffset? TimeSeriesEndDate
+    {
+        get => _timeSeriesEndDate;
+        set => SetProperty(ref _timeSeriesEndDate, value);
+    }
+
+    public string? TimeSeriesStatusMessage
+    {
+        get => _timeSeriesStatusMessage;
+        private set => SetProperty(ref _timeSeriesStatusMessage, value);
+    }
+
     public string? RepositoryPath
     {
         get => _repositoryPath;
@@ -119,6 +150,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _isAnalyzing;
         private set => SetProperty(ref _isAnalyzing, value);
+    }
+
+    public bool IsAnalyzingTimeSeries
+    {
+        get => _isAnalyzingTimeSeries;
+        private set => SetProperty(ref _isAnalyzingTimeSeries, value);
     }
 
     public bool HasRepository => !string.IsNullOrWhiteSpace(RepositoryPath);
@@ -166,6 +203,44 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (HasRepository)
             await AnalyzeCurrentRepositoryAsync();
+    }
+
+    public async Task RunTimeSeriesAsync()
+    {
+        if (!HasRepository)
+            return;
+
+        if (!TimeSeriesStartDate.HasValue || !TimeSeriesEndDate.HasValue)
+        {
+            TimeSeriesStatusMessage = "Start and end date are required.";
+            return;
+        }
+
+        var from = TimeSeriesStartDate.Value.Date;
+        var to = TimeSeriesEndDate.Value.Date;
+        if (from > to)
+        {
+            TimeSeriesStatusMessage = "Start date must be on or before end date.";
+            return;
+        }
+
+        try
+        {
+            IsAnalyzingTimeSeries = true;
+            TimeSeriesStatusMessage = "Analyzing time series...";
+            var points = await _repositoryAnalyzer.AnalyzeTimeSeriesAsync(_settings, from, to);
+            TimeSeries = BuildTimeSeries(points);
+            TimeSeriesStatusMessage = $"Rendered {TimeSeries.Count} file series across {points.Count} time points.";
+        }
+        catch (Exception ex)
+        {
+            TimeSeries = [];
+            TimeSeriesStatusMessage = ex.Message;
+        }
+        finally
+        {
+            IsAnalyzingTimeSeries = false;
+        }
     }
 
     private async Task AnalyzeCurrentRepositoryAsync()
@@ -316,4 +391,40 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private static string FormatDate(DateTime? value) =>
         value.HasValue ? value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "Unknown";
+
+    private static ObservableCollection<TimeSeriesGraphSeries> BuildTimeSeries(IReadOnlyList<TimeSeriesPoint> points)
+    {
+        var orderedPoints = points
+            .OrderBy(point => point.AsOf)
+            .ToArray();
+
+        var topFiles = orderedPoints
+            .SelectMany(point => point.Files.Select(file => new { point.AsOf, File = file }))
+            .GroupBy(item => item.File.FilePath, StringComparer.Ordinal)
+            .OrderByDescending(group => group.Max(item => item.File.ChurnRiskScore))
+            .ThenBy(group => group.Key, StringComparer.Ordinal)
+            .Take(TopTimeSeriesFileLimit)
+            .Select(group => group.Key)
+            .ToArray();
+
+        var series = topFiles.Select(filePath => new TimeSeriesGraphSeries
+        {
+            FilePath = filePath,
+            Points = orderedPoints
+                .Select(point =>
+                {
+                    var file = point.Files.FirstOrDefault(file =>
+                        string.Equals(file.FilePath, filePath, StringComparison.Ordinal));
+
+                    return new TimeSeriesGraphPoint
+                    {
+                        Date = point.AsOf,
+                        ChurnRiskScore = file?.ChurnRiskScore ?? 0,
+                    };
+                })
+                .ToArray(),
+        });
+
+        return new ObservableCollection<TimeSeriesGraphSeries>(series);
+    }
 }
