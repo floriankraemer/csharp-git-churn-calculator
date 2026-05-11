@@ -1,0 +1,79 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GitChurnCalculator.UI.Views.SettingsWindow"
+        Title="Analyzer Settings"
+        Width="680"
+        Height="420"
+        MinWidth="560"
+        MinHeight="360"
+        WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8">
+      <TextBlock Text="{Binding ValidationMessage}"
+                 Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Right"
+                  Spacing="8">
+        <Button Content="Cancel" Click="Cancel_Click" />
+        <Button Content="Save" Click="Save_Click" />
+      </StackPanel>
+    </StackPanel>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*"
+          ColumnDefinitions="140,*,Auto"
+          RowSpacing="12"
+          ColumnSpacing="8">
+      <TextBlock Grid.Row="0"
+                 VerticalAlignment="Center"
+                 Text="Repository" />
+      <TextBox Grid.Row="0"
+               Grid.Column="1"
+               Text="{Binding RepositoryPath}" />
+      <Button Grid.Row="0"
+              Grid.Column="2"
+              Content="Browse"
+              Click="BrowseRepository_Click" />
+
+      <TextBlock Grid.Row="1"
+                 VerticalAlignment="Center"
+                 Text="Coverage XML" />
+      <TextBox Grid.Row="1"
+               Grid.Column="1"
+               Text="{Binding CoverageFilePath}"
+               Watermark="Optional Cobertura or Visual Studio coverage XML" />
+      <Button Grid.Row="1"
+              Grid.Column="2"
+              Content="Browse"
+              Click="BrowseCoverage_Click" />
+
+      <TextBlock Grid.Row="2"
+                 VerticalAlignment="Center"
+                 Text="Include regex" />
+      <TextBox Grid.Row="2"
+               Grid.Column="1"
+               Grid.ColumnSpan="2"
+               Text="{Binding IncludePattern}"
+               Watermark="Optional repo-relative path regex" />
+
+      <TextBlock Grid.Row="3"
+                 VerticalAlignment="Center"
+                 Text="Exclude regex" />
+      <TextBox Grid.Row="3"
+               Grid.Column="1"
+               Grid.ColumnSpan="2"
+               Text="{Binding ExcludePattern}"
+               Watermark="Optional repo-relative path regex" />
+
+      <TextBlock Grid.Row="4"
+                 VerticalAlignment="Center"
+                 Text="Analyze as of" />
+      <DatePicker Grid.Row="4"
+                  Grid.Column="1"
+                  SelectedDate="{Binding AsOfDate}" />
+      <Button Grid.Row="4"
+              Grid.Column="2"
+              Content="Clear"
+              Click="ClearAsOf_Click" />
+    </Grid>
+  </DockPanel>
+</Window>

@@ -1,0 +1,90 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GitChurnCalculator.UI.Views.MainWindow"
+        Title="Git Churn Calculator"
+        Width="1100"
+        Height="720"
+        MinWidth="800"
+        MinHeight="520">
+  <DockPanel>
+    <Border DockPanel.Dock="Top"
+            Padding="12"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+        <Button Content="Open Repository" Click="OpenRepository_Click" />
+        <Button Grid.Column="1" Content="Refresh" Click="Refresh_Click" IsVisible="{Binding HasRepository}" />
+        <Button Grid.Column="2" Content="Settings" Click="Settings_Click" />
+        <TextBlock Grid.Column="3"
+                   VerticalAlignment="Center"
+                   Text="{Binding RepositoryPath}"
+                   TextTrimming="CharacterEllipsis" />
+        <ProgressBar Grid.Column="4"
+                     Width="140"
+                     IsIndeterminate="True"
+                     IsVisible="{Binding IsAnalyzing}" />
+      </Grid>
+    </Border>
+
+    <Grid>
+      <StackPanel HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Spacing="12"
+                  IsVisible="{Binding HasNoRepository}">
+        <TextBlock Text="No repository selected"
+                   HorizontalAlignment="Center"
+                   FontSize="18"
+                   FontWeight="SemiBold" />
+        <Button Content="Open Repository"
+                HorizontalAlignment="Center"
+                HorizontalContentAlignment="Center"
+                Padding="24,12"
+                Click="OpenRepository_Click" />
+      </StackPanel>
+
+      <Grid IsVisible="{Binding HasRepository}"
+            ColumnDefinitions="320,*">
+        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top"
+                       Margin="12"
+                       Text="Analyzed Files"
+                       FontWeight="SemiBold" />
+            <TreeView ItemsSource="{Binding FileTree}"
+                      SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+              <TreeView.ItemTemplate>
+                <TreeDataTemplate ItemsSource="{Binding Children}">
+                  <TextBlock Text="{Binding Name}" />
+                </TreeDataTemplate>
+              </TreeView.ItemTemplate>
+            </TreeView>
+          </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Column="1">
+          <StackPanel DockPanel.Dock="Top" Margin="16,12,16,8">
+            <TextBlock Text="File Details" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding StatusMessage}" Margin="0,4,0,0" />
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Margin="0,4,0,0"
+                       Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+          </StackPanel>
+
+          <DataGrid Margin="16,0,16,16"
+                    ItemsSource="{Binding SelectedFileMetrics}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    CanUserResizeColumns="True"
+                    CanUserSortColumns="False"
+                    GridLinesVisibility="All">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Metric" Binding="{Binding Name}" Width="2*" />
+              <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="3*" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>

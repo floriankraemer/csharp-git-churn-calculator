@@ -12,6 +12,7 @@
 #   make test
 #   make coverage
 #   make publish-single RID=linux-x64
+#   make publish-ui-win
 #
 # Escape hatch: set IN_CONTAINER=1 to run recipes directly on the host
 # (e.g. when already inside the container, or to use a host .NET SDK):
@@ -19,10 +20,12 @@
 
 SLN := GitChurnCalculator.slnx
 CONSOLE := GitChurnCalculator.Console/GitChurnCalculator.Console.csproj
+UI := GitChurnCalculator.UI/GitChurnCalculator.UI.csproj
 COV_DIR := $(CURDIR)/artifacts/coverage
+UI_APP_NAME := GitChurnCalculatorUI
 
 _DOTNET_RID := $(shell dotnet --info 2>/dev/null | sed -n 's/^[[:space:]]*RID:[[:space:]]*//p' | head -1)
-PUBLISH_RID := $(if $(strip $(RID)),$(strip $(RID)),$(if $(strip $(_DOTNET_RID)),$(_DOTNET_RID),linux-x64))
+PUBLISH_RID = $(if $(strip $(RID)),$(strip $(RID)),$(if $(strip $(_DOTNET_RID)),$(_DOTNET_RID),linux-x64))
 
 # Auto-pick a container runner unless the caller overrode it.
 ifeq ($(origin CONTAINER_RUNNER), undefined)
@@ -54,7 +57,9 @@ _CONTAINER_RUN = $(CONTAINER_RUNNER) run --rm dev make $@ RID="$(RID)" IN_CONTAI
 
 .DEFAULT_GOAL := help
 
-.PHONY: help restore build-debug build build-release test test-debug test-release clean ci publish-single pack-tool coverage mutation-test
+.PHONY: help restore build-debug build build-release build-ui test test-debug test-release clean ci publish-single publish-ui publish-ui-win pack-tool coverage mutation-test
+
+publish-ui-win: RID=win-x64
 
 help:
 	@echo "Git Churn Calculator — Makefile (same targets as make.ps1)"
@@ -65,12 +70,15 @@ help:
 	@echo "Usage:"
 	@echo "  make <target>"
 	@echo "  make publish-single RID=<runtime-identifier>"
+	@echo "  make publish-ui RID=<runtime-identifier>"
+	@echo "  make publish-ui-win      # builds artifacts/publish-ui-win-x64/GitChurnCalculatorUI.exe"
 	@echo "  IN_CONTAINER=1 make <target>    # run on host instead of container"
 	@echo ""
 	@echo "Targets:"
 	@echo "  restore          dotnet restore"
 	@echo "  build-debug      dotnet build (Debug)"
 	@echo "  build-release    dotnet build (Release)"
+	@echo "  build-ui         dotnet build UI project (Release)"
 	@echo "  build            same as build-debug"
 	@echo "  test             dotnet test (Release)"
 	@echo "  test-debug       dotnet test (Debug)"
@@ -78,6 +86,8 @@ help:
 	@echo "  clean            remove bin/obj folders under the solution"
 	@echo "  ci               restore, build-release, test-release, pack (dotnet tool nupkg)"
 	@echo "  publish-single   self-contained single-file publish -> artifacts/publish-<RID>"
+	@echo "  publish-ui       self-contained UI publish -> artifacts/publish-ui-<RID>"
+	@echo "  publish-ui-win   self-contained Windows UI publish -> artifacts/publish-ui-win-x64/GitChurnCalculatorUI.exe"
 	@echo "  pack-tool        dotnet tool package -> artifacts/nupkg"
 	@echo "  coverage         run tests with Coverlet + HTML report -> artifacts/coverage"
 	@echo "  mutation-test    dotnet tool restore + Stryker on critical libs (HTML under .../StrykerOutput/)"
@@ -95,6 +105,9 @@ build: build-debug
 
 build-release:
 	dotnet build $(SLN) -c Release
+
+build-ui:
+	dotnet build $(UI) -c Release
 
 test:
 	dotnet test $(SLN) -c Release --verbosity normal
@@ -120,6 +133,21 @@ publish-single:
 	@echo "Publishing self-contained single-file for RID: $(PUBLISH_RID) -> artifacts/publish-$(PUBLISH_RID)"
 	dotnet publish $(CONSOLE) -c Release -r $(PUBLISH_RID) --self-contained true -o artifacts/publish-$(PUBLISH_RID)
 	@echo "Done. Output folder: artifacts/publish-$(PUBLISH_RID)"
+
+publish-ui:
+	@echo "Publishing UI app for RID: $(PUBLISH_RID) -> artifacts/publish-ui-$(PUBLISH_RID)"
+	dotnet publish $(UI) -c Release -r $(PUBLISH_RID) --self-contained true -o artifacts/publish-ui-$(PUBLISH_RID) \
+		/p:PublishSingleFile=true \
+		/p:EnableCompressionInSingleFile=true \
+		/p:IncludeNativeLibrariesForSelfExtract=true
+	@ui_ext=""; case "$(PUBLISH_RID)" in win*) ui_ext=".exe";; esac; \
+	output_dir="artifacts/publish-ui-$(PUBLISH_RID)"; \
+	source_path="$$output_dir/GitChurnCalculator.UI$$ui_ext"; \
+	target_path="$$output_dir/$(UI_APP_NAME)$$ui_ext"; \
+	if [ -f "$$source_path" ] && [ "$$source_path" != "$$target_path" ]; then mv "$$source_path" "$$target_path"; fi; \
+	echo "Done. UI app: $$target_path"
+
+publish-ui-win: publish-ui
 
 pack-tool:
 	@mkdir -p artifacts/nupkg
@@ -159,7 +187,7 @@ mutation-test:
 
 else
 
-restore build-debug build build-release test test-debug test-release clean ci publish-single pack-tool coverage mutation-test:
+restore build-debug build build-release build-ui test test-debug test-release clean ci publish-single publish-ui publish-ui-win pack-tool coverage mutation-test:
 	$(_CONTAINER_RUN)
 
 endif
