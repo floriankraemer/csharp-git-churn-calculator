@@ -176,13 +176,52 @@
               <TextBlock Text="{Binding TimeSeriesStatusMessage}" />
             </StackPanel>
 
-            <Border Margin="16,0,16,16"
-                    Padding="12"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                    BorderThickness="1">
-              <ScottPlot:AvaPlot Name="TimeSeriesPlot"
-                                  MinHeight="500" />
-            </Border>
+            <Grid Margin="16,0,16,16"
+                  ColumnDefinitions="*,320"
+                  ColumnSpacing="12">
+              <Border Padding="12"
+                      BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                      BorderThickness="1">
+                <ScottPlot:AvaPlot Name="TimeSeriesPlot"
+                                    MinHeight="500" />
+              </Border>
+
+              <DockPanel Grid.Column="1">
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Series"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,8" />
+                <DataGrid DockPanel.Dock="Top"
+                          Height="220"
+                          ItemsSource="{Binding TimeSeries}"
+                          SelectedItem="{Binding SelectedTimeSeries, Mode=TwoWay}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserResizeColumns="True"
+                          CanUserSortColumns="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="2*" />
+                    <DataGridTextColumn Header="Max Score" Binding="{Binding MaxChurnRiskScore}" Width="*" />
+                  </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Selected Details"
+                           FontWeight="SemiBold"
+                           Margin="0,12,0,8" />
+                <DataGrid ItemsSource="{Binding SelectedTimeSeriesMetrics}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserResizeColumns="True"
+                          CanUserSortColumns="False"
+                          GridLinesVisibility="All">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Metric" Binding="{Binding Name}" Width="*" />
+                    <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*" />
+                  </DataGrid.Columns>
+                </DataGrid>
+              </DockPanel>
+            </Grid>
           </DockPanel>
         </TabItem>
 
@@ -210,13 +249,53 @@
               <TextBlock Text="{Binding TimeSeriesStatusMessage}" />
             </StackPanel>
 
-            <Border Margin="16,0,16,16"
-                    Padding="12"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                    BorderThickness="1">
-              <controls:TimeSeriesChart Series="{Binding TimeSeries}"
-                                        MinHeight="500" />
-            </Border>
+            <Grid Margin="16,0,16,16"
+                  ColumnDefinitions="*,320"
+                  ColumnSpacing="12">
+              <Border Padding="12"
+                      BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                      BorderThickness="1">
+                <controls:TimeSeriesChart Series="{Binding TimeSeries}"
+                                          SelectedSeries="{Binding SelectedTimeSeries, Mode=TwoWay}"
+                                          MinHeight="500" />
+              </Border>
+
+              <DockPanel Grid.Column="1">
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Series"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,8" />
+                <DataGrid DockPanel.Dock="Top"
+                          Height="220"
+                          ItemsSource="{Binding TimeSeries}"
+                          SelectedItem="{Binding SelectedTimeSeries, Mode=TwoWay}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserResizeColumns="True"
+                          CanUserSortColumns="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="2*" />
+                    <DataGridTextColumn Header="Max Score" Binding="{Binding MaxChurnRiskScore}" Width="*" />
+                  </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Selected Details"
+                           FontWeight="SemiBold"
+                           Margin="0,12,0,8" />
+                <DataGrid ItemsSource="{Binding SelectedTimeSeriesMetrics}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserResizeColumns="True"
+                          CanUserSortColumns="False"
+                          GridLinesVisibility="All">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Metric" Binding="{Binding Name}" Width="*" />
+                    <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*" />
+                  </DataGrid.Columns>
+                </DataGrid>
+              </DockPanel>
+            </Grid>
           </DockPanel>
         </TabItem>
       </TabControl>

@@ -18,8 +18,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private ObservableCollection<FileChurnResult> _fileList = [];
     private ObservableCollection<FileMetric> _selectedFileMetrics = [];
     private ObservableCollection<TimeSeriesGraphSeries> _timeSeries = [];
+    private ObservableCollection<FileMetric> _selectedTimeSeriesMetrics = [];
     private FileTreeNode? _selectedNode;
     private FileChurnResult? _selectedFile;
+    private TimeSeriesGraphSeries? _selectedTimeSeries;
     private string? _fileNameFilter;
     private DateTimeOffset? _timeSeriesStartDate = DateTimeOffset.UtcNow.AddMonths(-6);
     private DateTimeOffset? _timeSeriesEndDate = DateTimeOffset.UtcNow;
@@ -59,6 +61,24 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _timeSeries;
         private set => SetProperty(ref _timeSeries, value);
+    }
+
+    public ObservableCollection<FileMetric> SelectedTimeSeriesMetrics
+    {
+        get => _selectedTimeSeriesMetrics;
+        private set => SetProperty(ref _selectedTimeSeriesMetrics, value);
+    }
+
+    public TimeSeriesGraphSeries? SelectedTimeSeries
+    {
+        get => _selectedTimeSeries;
+        set
+        {
+            if (!SetProperty(ref _selectedTimeSeries, value))
+                return;
+
+            SelectedTimeSeriesMetrics = value is null ? [] : BuildTimeSeriesMetrics(value);
+        }
     }
 
     public FileTreeNode? SelectedNode
@@ -228,6 +248,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             IsAnalyzingTimeSeries = true;
             TimeSeriesStatusMessage = "Analyzing time series...";
+            SelectedTimeSeries = null;
             var points = await _repositoryAnalyzer.AnalyzeTimeSeriesAsync(_settings, from, to);
             TimeSeries = BuildTimeSeries(points);
             TimeSeriesStatusMessage = $"Rendered {TimeSeries.Count} file series across {points.Count} time points.";
@@ -235,6 +256,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             TimeSeries = [];
+            SelectedTimeSeries = null;
             TimeSeriesStatusMessage = ex.Message;
         }
         finally
@@ -352,6 +374,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public void SelectTimeSeries(string filePath)
+    {
+        SelectedTimeSeries = TimeSeries.FirstOrDefault(series =>
+            string.Equals(series.FilePath, filePath, StringComparison.Ordinal));
+    }
+
     private void ClearSelection()
     {
         SelectedNode = null;
@@ -392,6 +420,57 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static string FormatDate(DateTime? value) =>
         value.HasValue ? value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "Unknown";
 
+    private static ObservableCollection<FileMetric> BuildTimeSeriesMetrics(TimeSeriesGraphSeries series)
+    {
+        var point = series.DetailPoint;
+        if (point is null)
+            return [];
+
+        var deltas = BuildAverageDeltas(series);
+        return
+        [
+            new("File path", series.FilePath),
+            new("Date", point.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            new("Churn risk score", point.ChurnRiskScore.ToString("0.####", CultureInfo.InvariantCulture)),
+            new("Max churn risk score", series.MaxChurnRiskScore.ToString("0.####", CultureInfo.InvariantCulture)),
+            new("Changes per week", point.ChangesPerWeek.ToString("0.##", CultureInfo.InvariantCulture)),
+            new("Coverage", point.CoveragePercent.HasValue
+                ? $"{point.CoveragePercent.Value.ToString("0.##", CultureInfo.InvariantCulture)}%"
+                : "Not configured"),
+            new("Lines added (cum.)", point.LinesAdded.ToString(CultureInfo.InvariantCulture)),
+            new("Lines removed (cum.)", point.LinesRemoved.ToString(CultureInfo.InvariantCulture)),
+            new("Avg lines added/commit", FormatAverage(point.LinesAdded, point.TotalCommits)),
+            new("Avg lines removed/commit", FormatAverage(point.LinesRemoved, point.TotalCommits)),
+            new("Avg delta lines added/bucket", deltas.Added.ToString("0.##", CultureInfo.InvariantCulture)),
+            new("Avg delta lines removed/bucket", deltas.Removed.ToString("0.##", CultureInfo.InvariantCulture)),
+        ];
+    }
+
+    private static (double Added, double Removed) BuildAverageDeltas(TimeSeriesGraphSeries series)
+    {
+        var ordered = series.Points.OrderBy(point => point.Date).ToArray();
+        if (ordered.Length < 2)
+            return (0, 0);
+
+        var added = 0L;
+        var removed = 0L;
+        for (var i = 1; i < ordered.Length; i++)
+        {
+            added += ordered[i].LinesAdded - ordered[i - 1].LinesAdded;
+            removed += ordered[i].LinesRemoved - ordered[i - 1].LinesRemoved;
+        }
+
+        var buckets = ordered.Length - 1;
+        return (
+            Math.Round(added / (double)buckets, 2),
+            Math.Round(removed / (double)buckets, 2));
+    }
+
+    private static string FormatAverage(int value, int count) =>
+        count > 0
+            ? Math.Round(value / (double)count, 2).ToString("0.##", CultureInfo.InvariantCulture)
+            : "Not available";
+
     private static ObservableCollection<TimeSeriesGraphSeries> BuildTimeSeries(IReadOnlyList<TimeSeriesPoint> points)
     {
         var orderedPoints = points
@@ -420,6 +499,11 @@ public sealed class MainWindowViewModel : ViewModelBase
                     {
                         Date = point.AsOf,
                         ChurnRiskScore = file?.ChurnRiskScore ?? 0,
+                        ChangesPerWeek = file?.ChangesPerWeek ?? 0,
+                        TotalCommits = file?.TotalCommits ?? 0,
+                        LinesAdded = file?.LinesAdded ?? 0,
+                        LinesRemoved = file?.LinesRemoved ?? 0,
+                        CoveragePercent = file?.CoveragePercent,
                     };
                 })
                 .ToArray(),

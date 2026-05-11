@@ -33,10 +33,12 @@ public sealed partial class MainWindow : Window
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainWindowViewModel.TimeSeries) &&
-            sender is MainWindowViewModel viewModel)
+        if (sender is not MainWindowViewModel viewModel)
+            return;
+
+        if (e.PropertyName is nameof(MainWindowViewModel.TimeSeries) or nameof(MainWindowViewModel.SelectedTimeSeries))
         {
-            RenderTimeSeriesPlot(viewModel.TimeSeries);
+            RenderTimeSeriesPlot(viewModel.TimeSeries, viewModel.SelectedTimeSeries);
         }
     }
 
@@ -97,7 +99,9 @@ public sealed partial class MainWindow : Window
             await viewModel.ApplySettingsAsync(settingsViewModel);
     }
 
-    private void RenderTimeSeriesPlot(IEnumerable<TimeSeriesGraphSeries> series)
+    private void RenderTimeSeriesPlot(
+        IEnumerable<TimeSeriesGraphSeries> series,
+        TimeSeriesGraphSeries? selectedSeries = null)
     {
         var plot = this.FindControl<AvaPlot>("TimeSeriesPlot");
         if (plot is null)
@@ -105,7 +109,11 @@ public sealed partial class MainWindow : Window
 
         plot.Plot.Clear();
 
-        foreach (var item in series)
+        var orderedSeries = series
+            .OrderBy(item => IsSelected(item, selectedSeries))
+            .ToArray();
+
+        foreach (var item in orderedSeries)
         {
             var orderedPoints = item.Points
                 .OrderBy(point => point.Date)
@@ -122,18 +130,26 @@ public sealed partial class MainWindow : Window
                 .ToArray();
 
             var scatter = plot.Plot.Add.Scatter(xs, ys);
-            scatter.LegendText = ShortenPath(item.FilePath);
+            if (IsSelected(item, selectedSeries))
+            {
+                scatter.LineWidth = 3;
+                scatter.MarkerSize = 7;
+            }
+            else
+            {
+                scatter.LineWidth = 1.5f;
+                scatter.MarkerSize = 4;
+            }
         }
 
         plot.Plot.Title("Git churn risk graph");
         plot.Plot.XLabel("Date");
         plot.Plot.YLabel("Churn risk score");
         plot.Plot.Axes.DateTimeTicksBottom();
-        plot.Plot.ShowLegend();
         plot.Plot.Axes.AutoScale();
         plot.Refresh();
     }
 
-    private static string ShortenPath(string filePath) =>
-        filePath.Length <= 48 ? filePath : "..." + filePath[^45..];
+    private static bool IsSelected(TimeSeriesGraphSeries item, TimeSeriesGraphSeries? selectedSeries) =>
+        selectedSeries is not null && string.Equals(item.FilePath, selectedSeries.FilePath, StringComparison.Ordinal);
 }
